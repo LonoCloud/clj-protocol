@@ -13,12 +13,17 @@
 
   :source-paths ["src"]
 
-  :cljsbuild {
-    :builds [{:id "dhcp"
-              :source-paths ["src"]
-              :compiler {
-                :output-to "out/dhcp.js"
-                :output-dir "out"
-                :target :nodejs
-                :optimizations :none
-                :source-map true}}]})
+  :cljsbuild {:builds {:dev {:source-paths ["src"]
+                             :compiler {:output-to "out/dhcp.js"
+                                        :output-dir "out"
+                                        :target :nodejs
+                                        :optimizations :none
+                                        :source-map true}}
+                       :lib {:source-paths ["src/dhcp/"]
+                             :compiler {:output-to "lib/dhcp.js"
+                                        :target :nodejs
+                                        :optimizations :simple}}
+                       :release {:source-paths ["src/"]
+                                 :compiler {:output-to "dhcp.js"
+                                            :target :nodejs
+                                            :optimizations :simple}}}})

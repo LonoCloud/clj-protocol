@@ -34,6 +34,29 @@
                        "message with" (:yiaddr resp-msg-map)
                        "to" (:chaddr resp-msg-map))))))
 
+(defn first-free [ip-to-mac ranges]
+  (let [ips (mapcat #(dhcp/ip-seq (:start %1) (:end %1)) ranges)]
+    (first (filter #(not (contains? ip-to-mac %1)) ips))))
+
+;; (:pool cfg) should be an atom containing:
+;;     {:ranges [{:start <START-IP>
+;;                :end <END-IP>}...]
+;;      :ip-to-mac {<IP> <MAC>...}
+;;      :mac-to-ip {<MAC> <IP>}}
+(defn pool-handler [cfg msg-map]
+  (let [{:keys [pool save-pool if-info]} cfg
+        chaddr (dhcp/octet->mac (:chaddr msg-map))
+        {:keys [ip-to-mac mac-to-ip ranges]} @pool
+        cur-ip (get mac-to-ip chaddr)
+        ip (or cur-ip (first-free ip-to-mac ranges))]
+    (assert ip "DHCP pool exhausted")
+    (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr)
+    (swap! pool #(-> %1 (assoc-in [:mac-to-ip %2] %3)
+                     (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
+    (save-pool cfg @pool)
+    (assoc (dhcp/default-response msg-map (:octets if-info))
+      :yiaddr (dhcp/ip->octet ip))))
+
 (defn create-server [cfg]
   (let [{:keys [if-name]} cfg
         sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})

@@ -3,55 +3,38 @@
             [dhcp.node-server :as server]
             [clojure.walk :refer [postwalk]]))
 
-(def fs (js/require "fs"))
-(defn slurp [f] (.readFileSync fs f "utf-8"))
-(defn spit [f data] (.writeFileSync fs f data))
-
 ;; {:ranges [{:start <START-IP>
-;;              :end <END-IP>}...]
+;;            :end <END-IP>}...]
 ;;  :ip-to-mac {<IP> <MAC>...}
 ;;  :mac-to-ip {<MAC> <IP>}}
 (def pool (atom nil))
 
+(def fs (js/require "fs"))
+(defn slurp [f] (.readFileSync fs f "utf-8"))
+(defn spit [f data] (.writeFileSync fs f data))
+
 (def kw-set #{"ranges" "start" "end" "ip-to-mac" "mac-to-ip"})
-(defn load-pool [path]
-  (let [raw (js->clj (js/JSON.parse (slurp path)))
+(defn load-json-pool [cfg]
+  (let [raw (js->clj (js/JSON.parse (slurp (:leases-file cfg))))
         f (fn [[k v]] (if (kw-set k) [(keyword k) v] [k v]))]
     (postwalk  (fn [x] (if (map? x) (into {} (map f x)) x)) raw)))
 
-(defn save-pool [path data] (spit path (js/JSON.stringify (clj->js data))))
-
-(defn first-free [ip-to-mac ranges]
-  (let [ips (mapcat #(dhcp/ip-seq (:start %1) (:end %1)) ranges)]
-    (first (filter #(not (contains? ip-to-mac %1)) ips))))
+(defn save-json-pool [cfg data]
+  (spit (:leases-file cfg) (js/JSON.stringify (clj->js data))))
 
 (defn json-pool-init [cfg]
-  (let [{:keys [leases-file if-info]} cfg
+  (let [{:keys [leases-file pool save-pool load-pool if-info]} cfg
         {:keys [address netmask]} if-info]
     (if (.existsSync fs leases-file)
       (do
         (println "Loading leases file:" leases-file)
-        (reset! pool (load-pool leases-file)))
+        (reset! pool (load-pool cfg)))
       (let [[start-ip end-ip] (dhcp/network-start-end address netmask true)]
         (println "Creating new leases file:" leases-file)
         (reset! pool {:ranges [{:start start-ip :end end-ip}]
                       :ip-to-mac {}
                       :mac-to-ip {}})
-        (save-pool leases-file @pool)))))
-
-(defn json-pool-handler [cfg msg-map]
-  (let [chaddr (dhcp/octet->mac (:chaddr msg-map))
-        {:keys [ip-to-mac mac-to-ip ranges]} @pool
-        cur-ip (get mac-to-ip chaddr)
-        ip (or cur-ip (first-free ip-to-mac ranges))]
-    (assert ip "DHCP pool exhausted")
-    (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr)
-    (swap! pool #(-> %1 (assoc-in [:mac-to-ip %2] %3)
-                     (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
-    (save-pool (:leases-file cfg) @pool)
-    (assoc (dhcp/default-response msg-map (:octets (:if-info cfg)))
-      :yiaddr (dhcp/ip->octet ip))))
-
+        (save-pool cfg @pool)))))
 
 (defn -main [if-name & args]
   (when-not if-name
@@ -59,8 +42,11 @@
     (.exit js/process 0))
 
   (let [if-info (server/get-if-ipv4 if-name)
-        cfg {:message-handler json-pool-handler
+        cfg {:message-handler server/pool-handler
              :leases-file "dhcp-leases.json"
+             :pool pool
+             :load-pool load-json-pool
+             :save-pool save-json-pool
              :if-name if-name
              :if-info if-info}]
 

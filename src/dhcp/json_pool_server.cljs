@@ -54,8 +54,8 @@
     (server/create-server cfg)))
 
 ;; Only set main if we are being run
-(try
-  (when (re-seq #"json_pool_server" (.-id js/module))
-    (set! *main-cli-fn* -main))
-  (catch :default exc nil))
+;;(try
+;;  (when (re-seq #"json_pool_server" (.-id js/module))
+;;    (set! *main-cli-fn* -main))
+;;  (catch :default exc nil))
 

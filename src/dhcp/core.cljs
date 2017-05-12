@@ -113,13 +113,14 @@
 ;; General DHCP message reading/writing
 
 (def readers
-  {:raw   identity
-   :str   #(apply str (map char (take-while pos? %1))) ;; strips 0 chars
-   :int8  #(first %1)
-   :int16 #(reduce (fn [a b] (+ b (bit-shift-left a 8))) (take 2 %1))
-   :int32 #(reduce (fn [a b] (+ b (bit-shift-left a 8))) (take 4 %1))
-   :ipv4  #(take 4 %1)
-   :mac   #(take 6 %1)
+  {:raw      identity
+   :str      #(apply str (map char (take-while pos? %1))) ;; strips 0 chars
+   :int8     #(first %1)
+   :int16    #(reduce (fn [a b] (+ b (bit-shift-left a 8))) (take 2 %1))
+   :int32    #(reduce (fn [a b] (+ b (bit-shift-left a 8))) (take 4 %1))
+   :ipv4     #(take 4 %1)
+   :ipv4set  #(set (partition 4 %1))
+   :mac      #(take 6 %1)
    :msg-type #(get MSG-TYPE-LOOKUP (first %1))})
 
 (def writers

@@ -1,6 +1,5 @@
 (ns dhcp.core
-  (:require [cljs.nodejs :as nodejs]
-            [clojure.string :as string]))
+  (:require [clojure.string :as string]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RFC defined values (uppercased)
@@ -94,21 +93,22 @@
 (def OPTS-LOOKUP (olist->map OPTS-LIST))
 (def OPTS-ETHERBOOT-LOOKUP (olist->map OPTS-ETHERBOOT-LIST))
 
-(def MSG-TYPE-LIST [;; num,  message, resp
-                    [1   :DISCOVER     :OFFER]
-                    [2   :OFFER        nil]
-                    [3   :REQUEST      :ACK]
-                    [4   :DECLINE      nil]
-                    [5   :ACK          nil]
-                    [6   :NAK          nil]
-                    [7   :RELEASE      :ACK]
-                    [8   :INFORM       :ACK]])
+(def MSG-TYPE-LIST [;; num,  message, resp, broadcast
+                    [1   :DISCOVER     :OFFER true]
+                    [2   :OFFER        nil    nil]
+                    [3   :REQUEST      :ACK   true]
+                    [4   :DECLINE      nil    nil] ;; We don't currently handle decline
+                    [5   :ACK          nil    nil]
+                    [6   :NAK          nil    nil]
+                    [7   :RELEASE      :ACK   false]
+                    [8   :INFORM       :ACK   false]])
 (def MSG-TYPE-LOOKUP
-  (merge (into {} (map (fn [[n m r]] [n m]) MSG-TYPE-LIST))
-         (into {} (map (fn [[n m r]] [m n]) MSG-TYPE-LIST))))
+  (merge (into {} (map (fn [[n m r b]] [n m]) MSG-TYPE-LIST))
+         (into {} (map (fn [[n m r b]] [m n]) MSG-TYPE-LIST))))
 (def MSG-TYPE-RESP-LOOKUP
-  (into {} (map (fn [[n m r]] [m r]) MSG-TYPE-LIST)))
-
+  (into {} (map (fn [[n m r b]] [m r]) MSG-TYPE-LIST)))
+(def MSG-TYPE-BCAST-LOOKUP
+  (into {} (map (fn [[n m r b]] [m b]) MSG-TYPE-LIST)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General DHCP message reading/writing
 

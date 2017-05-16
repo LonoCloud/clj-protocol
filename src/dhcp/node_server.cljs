@@ -19,20 +19,24 @@
                :broadcast (dhcp/ip->octet (dhcp/broadcast address netmask))
                :mac (dhcp/mac->octet (:mac srv-if-ipv4))})))
 
-(defn generic-message-handler [cfg msg]
-  (let [{:keys [sock if-info]} cfg
+(defn server-message-handler [cfg msg rinfo]
+  (let [{:keys [sock if-info disable-bcast]} cfg
         msg-map (dhcp/read-message (-> msg .toJSON .-data js->clj))
-        _ (println "Received" (:opt/msg-type msg-map)
+        msg-type (:opt/msg-type msg-map)
+        _ (println "Received" msg-type
                    "message from" (:chaddr msg-map))
         resp-msg-map ((:message-handler cfg) cfg msg-map)
         buf (js/Buffer. (clj->js (dhcp/write-message resp-msg-map)))
-        resp-addr (string/join "." (:broadcast (:octets if-info)))]
+        resp-addr (if (and (not disable-bcast)
+                           (dhcp/MSG-TYPE-BCAST-LOOKUP msg-type))
+                    (string/join "." (:broadcast (:octets if-info)))
+                    (:address rinfo))]
     (.send sock buf 0 (.-length buf) dhcp/SEND-PORT resp-addr
            #(if %1
               (println "Send failed:" %1)
               (println "Sent" (:opt/msg-type resp-msg-map)
                        "message with" (:yiaddr resp-msg-map)
-                       "to" (:chaddr resp-msg-map))))))
+                       "to" resp-addr "/" (:chaddr resp-msg-map))))))
 
 (defn first-free [ip-to-mac ranges]
   (let [ips (mapcat #(dhcp/ip-seq (:start %1) (:end %1)) ranges)]
@@ -63,7 +67,9 @@
         cfg (assoc cfg :sock sock)]
     (doto sock
       (.on "error" (fn [& err] (prn :err err)))
-      (.on "message" (fn [msg rinfo] (generic-message-handler cfg msg)))
+      (.on "message" (fn [msg rinfo]
+                       (server-message-handler
+                        cfg msg (js->clj rinfo :keywordize-keys true))))
       (.on "listening" (fn []
                          (.setBroadcast sock true)
                          (socket/bind-to-device sock if-name)

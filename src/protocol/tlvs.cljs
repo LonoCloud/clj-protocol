@@ -12,6 +12,7 @@
    :names (into {} (map (fn [[c n t l]] [n c]) tlist))
    :codes (into {} (map (fn [[c n t l]] [c n]) tlist))})
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV readers
 
 (defn read-tlv
@@ -60,6 +61,7 @@
 (def read-tlv-map-1-1 (partial read-tlv-map :uint8  1 :uint8  1))
 (def read-tlv-map-2-2 (partial read-tlv-map :uint16 2 :uint16 2))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV writers
 
 (defn write-tlv

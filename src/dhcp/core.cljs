@@ -33,29 +33,29 @@
 (def OPTS-LIST
   ;; code,  name,                type          lookup
   (into
-    [[53  :opt/msg-type          :msg-type     nil ] ;; Typically sent first
-     [1   :opt/netmask           :ipv4         nil ]
-     [3   :opt/router            :ipv4         nil ]
-     [4   :opt/time-servers      :ipv4set      nil ]
-     [6   :opt/dns-servers       :ipv4set      nil ]
-     [12  :opt/hostname          :str          nil ]
-     [15  :opt/domainname        :str          nil ]
-     [28  :opt/mtu               :uint16       nil ]
-     [28  :opt/broadcast         :ipv4         nil ]
-     [41  :opt/nis-servers       :ipv4set      nil ]
-     [43  :opt/vend-spec-info    :raw          nil ]
-     [50  :opt/addr-req          :ipv4         nil ]
-     [51  :opt/lease-time        :uint32       nil ]
-     [54  :opt/dhcp-server-id    :ipv4         nil ]
-     [55  :opt/parm-list         :raw          nil ]
-     [58  :opt/renew-time        :uint32       nil ]
-     [59  :opt/rebind-time       :uint32       nil ]
-     [60  :opt/vendor-class-id   :raw          nil ]
-     [61  :opt/client-id         :raw          nil ]
-     [67  :opt/bootfile          :str          nil ]
-     [82  :opt/relay-agent-info  :tlv-map-1-1  OPTS-RELAY-AGENT-LOOKUP ]
-     [97  :opt/guid              :raw          nil ]
-     [175 :opt/etherboot         :tlv-map-1-1  OPTS-ETHERBOOT-LOOKUP ]] ;; gPXE/iPXE
+    [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
+     [1   :opt/netmask           :ipv4         nil]
+     [3   :opt/router            :ipv4         nil]
+     [4   :opt/time-servers      :ipv4set      nil]
+     [6   :opt/dns-servers       :ipv4set      nil]
+     [12  :opt/hostname          :str          nil]
+     [15  :opt/domainname        :str          nil]
+     [28  :opt/mtu               :uint16       nil]
+     [28  :opt/broadcast         :ipv4         nil]
+     [41  :opt/nis-servers       :ipv4set      nil]
+     [43  :opt/vend-spec-info    :raw          nil]
+     [50  :opt/addr-req          :ipv4         nil]
+     [51  :opt/lease-time        :uint32       nil]
+     [54  :opt/dhcp-server-id    :ipv4         nil]
+     [55  :opt/parm-list         :raw          nil]
+     [58  :opt/renew-time        :uint32       nil]
+     [59  :opt/rebind-time       :uint32       nil]
+     [60  :opt/vendor-class-id   :raw          nil]
+     [61  :opt/client-id         :raw          nil]
+     [67  :opt/bootfile          :str          nil]
+     [82  :opt/relay-agent-info  :tlv-map-1-1  OPTS-RELAY-AGENT-LOOKUP]
+     [97  :opt/guid              :raw          nil]
+     [175 :opt/etherboot         :tlv-map-1-1  OPTS-ETHERBOOT-LOOKUP]] ;; gPXE/iPXE
 
     (concat
       ;; RFC-3942 site-specific options (224-254)
@@ -88,7 +88,6 @@
    [:chaddr        :mac          6     [0 0 0 0 0 0]          nil]
    [:chaddr-extra  :raw          10    [0 0 0 0 0 0 0 0 0 0]  nil]
    [:sname         :str          64    ""                     nil]
-   ;; Dupe of opt-bootfile but with zero padding
    [:opt/bootfile  :str          128   ""                     nil] ;; :file
    [:cookie        :raw          4     [99 130 83 99]         nil]
    [:INTO          :tlv-map-1-1  :*    nil                    OPTS-LOOKUP]])
@@ -175,5 +174,4 @@
        :opt/dhcp-server-id (:address srv-if)
        :opt/broadcast      (:broadcast srv-if)
        :opt/dns-servers  #{(:address srv-if)}})))
-
 

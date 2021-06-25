@@ -1,5 +1,5 @@
 (ns dhcp.json-pool-server
-  (:require [protocol.fields :as fields]
+  (:require [protocol.addrs :as addrs]
             [dhcp.core :as dhcp]
             [dhcp.util :as util]
             [dhcp.node-server :as server]
@@ -31,7 +31,7 @@
       (do
         (println "Loading leases file:" leases-file)
         (reset! pool (load-pool cfg)))
-      (let [[start-ip end-ip] (fields/network-start-end address netmask true)]
+      (let [[start-ip end-ip] (addrs/network-start-end address netmask true)]
         (println "Creating new leases file:" leases-file)
         (reset! pool {:ranges [{:start start-ip :end end-ip}]
                       :ip-to-mac {address mac}
@@ -39,7 +39,7 @@
         (save-pool cfg @pool)))))
 
 (defn first-free [ip-to-mac ranges]
-  (let [ips (mapcat #(fields/ip-seq (:start %1) (:end %1)) ranges)]
+  (let [ips (mapcat #(addrs/ip-seq (:start %1) (:end %1)) ranges)]
     (first (filter #(not (contains? ip-to-mac %1)) ips))))
 
 ;; (:pool cfg) should be an atom containing:
@@ -49,7 +49,7 @@
 ;;      :mac-to-ip {<MAC> <IP>}}
 (defn pool-handler [cfg msg-map]
   (let [{:keys [pool save-pool if-info]} cfg
-        chaddr (fields/octet->mac (:chaddr msg-map))
+        chaddr (addrs/octet->mac (:chaddr msg-map))
         {:keys [ip-to-mac mac-to-ip ranges]} @pool
         cur-ip (get mac-to-ip chaddr)
         ip (or cur-ip (first-free ip-to-mac ranges))]
@@ -59,15 +59,15 @@
                      (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
     (save-pool cfg @pool)
     (assoc (dhcp/default-response msg-map (:octets if-info))
-      :yiaddr (fields/ip->octet ip))))
+      :yiaddr (addrs/ip->octet ip))))
 
 (defn log-message [cfg msg-map addr]
   (let [msg-type (:opt/msg-type msg-map)
-        mac (fields/octet->mac (:chaddr msg-map))]
+        mac (addrs/octet->mac (:chaddr msg-map))]
     (if (#{:DISCOVER :REQUEST} msg-type)
       (println "Received" msg-type "for" mac "from" addr)
       (println "Sent" msg-type "for"  mac "to" addr
-               "with yiaddr" (fields/octet->ip (:yiaddr msg-map))))))
+               "with yiaddr" (addrs/octet->ip (:yiaddr msg-map))))))
 
 (defn log-lease [cfg msg-map cur-ip ip chaddr]
   (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr))

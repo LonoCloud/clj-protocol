@@ -2,14 +2,16 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [protocol.fields :as fields]))
 
-(deftest test-net-addr-functions
-  (println "  test-net-addr-functions")
+(def freaders fields/readers)
+(def fwriters fields/writers)
+
+(deftest test-field-functiosn
+  (println "  test-field-functions")
   (is (= 16909060      (fields/octet->int [1 2 3 4])))
   (is (= [1 2 3 4]     (fields/int->octet 16909060 4)))
   (is (= [0 0 1 2 3 4] (fields/int->octet 16909060 6)))
   (is (= 1108152157446 (fields/octet->int [1 2 3 4 5 6])))
-  (is (= [1 2 3 4 5 6] (fields/int->octet 1108152157446 6)))
-  )
+  (is (= [1 2 3 4 5 6] (fields/int->octet 1108152157446 6))))
 
 ;;;;;
 
@@ -27,7 +29,7 @@
                    :mac       [67 68 69 70 71 72]
                    :bitfield  {:a 269, :b false, :c true, :d 17734}}]
       (println "    reader" t)
-      (let [res ((fields/readers t) buf 2 6 fields/readers bit-spec)]
+      (let [res ((freaders t) buf 2 6 freaders bit-spec)]
         (is res)
         (is (= v res))))))
 
@@ -47,7 +49,7 @@
                                              4 [0 0 67 68 69 70  0  0  0  0]]}]
       (println "    writer" t v1 v2 v3)
       (let [buf (.alloc js/Buffer 10)
-            sz ((fields/writers t) buf v1 2 fields/writers bit-spec)
+            sz ((fwriters t) buf v1 2 fwriters bit-spec)
             octs (vec (.slice buf 0))]
         (is (> sz 0))
         (is (= v3 octs))))))
@@ -57,13 +59,13 @@
   (let [arr [0 0 65 66 67 68 0 0]
         buf (.from js/Buffer (clj->js arr))]
     (println "    readers")
-    (is (= "ABCD" ((fields/readers :str) buf 2 6)))
+    (is (= "ABCD" ((freaders :str) buf 2 6)))
     ;; Test that zero bytes are ignored
-    (is (= "ABCD" ((fields/readers :str) buf 2 8))))
+    (is (= "ABCD" ((freaders :str) buf 2 8))))
   (let [arr [0 0 69 70 71 72 0 0]]
     (println "    writers")
     (let [buf (.alloc js/Buffer 8)]
-      ((fields/writers :str) buf "EFGH" 2 6)
+      ((fwriters :str) buf "EFGH" 2 6)
       (is (= 0 (.compare buf (.from js/Buffer (clj->js arr)))))
-      (is (= "EFGH" ((fields/readers :str) buf 2 8))))))
+      (is (= "EFGH" ((freaders :str) buf 2 8))))))
 

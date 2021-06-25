@@ -1,15 +1,12 @@
 (ns dhcp.node-client
-  (:require [clojure.string :as string]
-            [protocol.fields :as fields]
+  (:require [protocol.addrs :as addrs]
             [protocol.socket :as socket]
             [dhcp.core :as dhcp]
             [dhcp.util :as util]))
 
 (def minimist (js/require "minimist"))
-(def fs (js/require "fs"))
 (def dgram (js/require "dgram"))
 (def pcap (js/require "pcap"))
-
 
 (defn client-message-handler [cfg msg]
   (let [{:keys [verbose sock if-name hw-addr server-ip state]} cfg
@@ -20,7 +17,7 @@
     (if (and msg-map (not= hw-addr chaddr))
       (when verbose
         (println "Ignoring" msg-type "for"
-                 (if chaddr (fields/octet->mac chaddr) "") "(not us)"))
+                 (if chaddr (addrs/octet->mac chaddr) "") "(not us)"))
       (let [;; _ (prn :msg-map msg-map)
             resp-defaults {:chaddr hw-addr}
             resp-msg-map (condp = msg-type
@@ -35,12 +32,12 @@
         (swap! state assoc :last-tx-ts (.getTime (js/Date.)))
         (when msg-map
           (println "Received" msg-type
-                   "message from" (fields/octet->ip (:siaddr msg-map))))
+                   "message from" (addrs/octet->ip (:siaddr msg-map))))
         (if (= :ACK msg-type)
           (do
-            (util/set-address if-name
-                              (fields/octet->ip (:yiaddr msg-map))
-                              (fields/octet->ip (:opt/netmask msg-map)))
+            (util/set-ip-address if-name
+                                 (addrs/octet->ip (:yiaddr msg-map))
+                                 (addrs/octet->ip (:opt/netmask msg-map)))
             (swap! state assoc :assigned? true ))
           (if resp-msg-map
             (let [buf (dhcp/write-dhcp resp-msg-map)]
@@ -49,11 +46,11 @@
                         (println "Send failed:" %1)
                         (println "Sent" (:opt/msg-type resp-msg-map)
                                  "to" server-ip))))
-            (println "Got address:" (fields/octet->ip (:yiaddr msg-map)))))))))
+            (println "Got address:" (addrs/octet->ip (:yiaddr msg-map)))))))))
 
 (defn start-pcap-listener [{:keys [hw-addr if-name] :as cfg}]
   (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
-                         " and not ether src " (fields/octet->mac hw-addr))
+                         " and not ether src " (addrs/octet->mac hw-addr))
         psession (.createSession pcap if-name #js {:filter pcap-filter})]
     (println (str "Listening via pcap (filter: '" pcap-filter "')"))
     (doto psession
@@ -76,21 +73,20 @@
                                :i :if-name
                                :s :server-ip
                                :u :unicast}
-		       :default {:verbose false
-				 :if-name "eth0"
+                       :default {:verbose false
+                                 :if-name "eth0"
                                  :server-ip "255.255.255.255"
                                  :unicast false}}
         opts (js->clj (minimist (apply array args) (clj->js minimist-opts))
                       :keywordize-keys true)
         {:keys [verbose if-name server-ip unicast]} opts
 
-        haddr-file (str "/sys/class/net/" if-name "/address")
-        hw-addr (string/trim (.readFileSync fs haddr-file "utf8"))
+        hw-addr (util/get-mac-address if-name)
         sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
         cfg {:if-name if-name
-             :hw-addr (fields/mac->octet hw-addr)
+             :hw-addr (addrs/mac->octet hw-addr)
              :server-ip server-ip
-             :server-addr (fields/ip->octet server-ip)
+             :server-addr (addrs/ip->octet server-ip)
              :sock sock
              :state (atom {:assigned? false
                            :last-tx-ts 0})}]

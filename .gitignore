@@ -1,12 +1,6 @@
-pom.xml
-*jar
-/lib/
-/classes/
-/out/
-/target/
-.lein-deps-sum
-.lein-repl-history
-.lein-plugins/
+node_modules
+.shadow-cljs
 protocol-test.js
 client.js
 server.js
+build

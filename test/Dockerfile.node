@@ -1,0 +1,12 @@
+FROM node:12
+
+RUN apt-get -y update
+RUN apt-get -y install tcpdump
+RUN apt-get -y install libpcap-dev
+RUN apt-get -y install isc-dhcp-client isc-dhcp-server iputils-ping
+
+RUN mkdir -p /root/app
+ADD ./package.json /root/app
+RUN cd /root/app && npm --unsafe-perm install
+
+ADD test/init.sh /root/app

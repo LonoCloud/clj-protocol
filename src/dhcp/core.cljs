@@ -48,7 +48,8 @@
      [55  :opt/parm-list         :raw          nil ]
      [58  :opt/renew-time        :uint32       nil ]
      [59  :opt/rebind-time       :uint32       nil ]
-     [60  :opt/vend-cls-ident    :raw          nil ]
+     [60  :opt/class-id          :raw          nil ]
+     [61  :opt/client-id         :raw          nil ]
      [67  :opt/bootfile          :str          nil ]
      [82  :opt/relay-agent-info  :tlv-map-1-1  OPTS-RELAY-AGENT-LOOKUP ]
      [97  :opt/guid              :raw          nil ]
@@ -63,6 +64,7 @@
       [[255 :opt/end             :stop        nil ]])))
 (def OPTS-LOOKUP (tlvs/tlv-list->lookup OPTS-LIST))
 
+;; https://datatracker.ietf.org/doc/html/rfc2131
 (def DHCP-HEADER
 ;;  name,          type,    length,  default,                 lookup
   [[:op            :uint8        1     0                      nil]

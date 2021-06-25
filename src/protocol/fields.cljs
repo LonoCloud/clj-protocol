@@ -45,6 +45,13 @@
         (ip->octet ip)
         (map #(+ 256 (bit-not %1)) (ip->octet netmask)))))
 
+(defn mask-int->prefix [mask-int]
+  (let [bin (.toString mask-int 2)]
+    (count (filter #(= "1" %) (.split bin "")))))
+
+(defn mask-ip->prefix [mask-ip]
+  (mask-int->prefix (ip->int mask-ip)))
+
 (defn network-start-end [ip netmask & [usable?]]
   (let [start (ip->int (first-ip ip netmask))
         end (ip->int (broadcast ip netmask))]

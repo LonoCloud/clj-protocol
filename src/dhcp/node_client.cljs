@@ -1,53 +1,111 @@
 (ns dhcp.node-client
-  (:require [protocol.fields :as fields]
+  (:require [clojure.string :as string]
+            [protocol.fields :as fields]
+            [protocol.socket :as socket]
             [dhcp.core :as dhcp]
-            ;; Move get-if-ipv4 to more generic location
-            [dhcp.node-server :as server]))
+            [dhcp.util :as util]))
 
+(def minimist (js/require "minimist"))
+(def fs (js/require "fs"))
 (def dgram (js/require "dgram"))
+(def pcap (js/require "pcap"))
 
-(defn client-message-handler [cfg msg resp-addr]
-  (let [{:keys [sock]} cfg
-        resp-ip (fields/octet->ip resp-addr)
+
+(defn client-message-handler [cfg msg]
+  (let [{:keys [verbose sock if-name hw-addr server-ip state]} cfg
         msg-map (when msg
                   (dhcp/read-dhcp msg))
         msg-type (:opt/msg-type msg-map)
-        resp-msg-map (condp = msg-type
-                       nil    {:op 1 :opt/msg-type :DISCOVER}
-                       :OFFER {:op 1 :opt/msg-type :REQUEST}
-                       :ACK   nil
-                       :NACK (throw (js/Error. "Received NACK"))
-                       (throw (js/Error. (str "Received invalid msg type"
-                                              msg-type))))]
-    (when msg-map
-      (println "Received" msg-type
-               "message from" (fields/octet->ip (:siaddr msg-map))))
-    (if resp-msg-map
-      (let [buf (dhcp/write-dhcp resp-msg-map)]
-        (.send sock buf 0 (.-length buf) dhcp/RECV-PORT resp-ip
-               #(if %1
-                  (println "Send failed:" %1)
-                  (println "Sent" (:opt/msg-type resp-msg-map)
-                           "to" resp-ip))))
-      (println "Got address:" (fields/octet->ip (:yiaddr msg-map))))))
+        chaddr (:chaddr msg-map) ]
+    (if (and msg-map (not= hw-addr chaddr))
+      (when verbose
+        (println "Ignoring" msg-type "for"
+                 (if chaddr (fields/octet->mac chaddr) "") "(not us)"))
+      (let [;; _ (prn :msg-map msg-map)
+            resp-defaults {:chaddr hw-addr}
+            resp-msg-map (condp = msg-type
+                           nil    (merge resp-defaults
+                                         {:op 1 :opt/msg-type :DISCOVER})
+                           :OFFER (merge resp-defaults
+                                         {:op 1 :opt/msg-type :REQUEST})
+                           :ACK   nil
+                           :NACK (println "Received NACK")
+                           (throw (println (str "Received invalid msg type"
+                                                msg-type))))]
+        (swap! state assoc :last-tx-ts (.getTime (js/Date.)))
+        (when msg-map
+          (println "Received" msg-type
+                   "message from" (fields/octet->ip (:siaddr msg-map))))
+        (if (= :ACK msg-type)
+          (do
+            (util/set-address if-name
+                              (fields/octet->ip (:yiaddr msg-map))
+                              (fields/octet->ip (:opt/netmask msg-map)))
+            (swap! state assoc :assigned? true ))
+          (if resp-msg-map
+            (let [buf (dhcp/write-dhcp resp-msg-map)]
+              (.send sock buf 0 (.-length buf) dhcp/RECV-PORT server-ip
+                     #(if %1
+                        (println "Send failed:" %1)
+                        (println "Sent" (:opt/msg-type resp-msg-map)
+                                 "to" server-ip))))
+            (println "Got address:" (fields/octet->ip (:yiaddr msg-map)))))))))
+
+(defn start-pcap-listener [{:keys [hw-addr if-name] :as cfg}]
+  (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
+                         " and not ether src " (fields/octet->mac hw-addr))
+        psession (.createSession pcap if-name #js {:filter pcap-filter})]
+    (println (str "Listening via pcap (filter: '" pcap-filter "')"))
+    (doto psession
+      (.on "packet" (fn [pkt]
+                      (let [buf ^js/Buffer (.-buf pkt)
+                            dhcp (.slice buf socket/UDP-PAYLOAD-OFF)]
+                        ;;(js/console.log "dhcp buf:" dhcp)
+                        (client-message-handler cfg dhcp)))))))
 
 ;; TODO: - lease renewal
-;;       - sending out MAC
-(defn main [if-name & [server-ip & args]]
-  (when-not if-name
-    (println "Must specify an interface name")
-    (.exit js/process 0))
+(defn tick [cfg]
+  (let [{:keys [assigned? last-tx-ts]} @(:state cfg)]
+    (when (and (not assigned?)
+               (> (.getTime (js/Date.)) (+ 5000 last-tx-ts)))
+      ;; Trigger DISCOVER
+      (client-message-handler cfg nil))))
 
-  (let [if-info (server/get-if-ipv4 if-name)
-        bcast-addr (:broadcast (:octets if-info))
-        server-addr (if server-ip (fields/ip->octet server-ip) bcast-addr)
+(defn main [& args]
+  (let [minimist-opts {:alias {:v :verbose
+                               :i :if-name
+                               :s :server-ip
+                               :u :unicast}
+		       :default {:verbose false
+				 :if-name "eth0"
+                                 :server-ip "255.255.255.255"
+                                 :unicast false}}
+        opts (js->clj (minimist (apply array args) (clj->js minimist-opts))
+                      :keywordize-keys true)
+        {:keys [verbose if-name server-ip unicast]} opts
+
+        haddr-file (str "/sys/class/net/" if-name "/address")
+        hw-addr (string/trim (.readFileSync fs haddr-file "utf8"))
         sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
-        cfg {:sock sock}
-        sock (doto sock
-               (.on "listening" (fn []
-                                  (when (= bcast-addr server-addr)
-                                    (.setBroadcast sock true))))
-               (.on "message" (fn [msg rinfo]
-                                (client-message-handler cfg msg server-addr)))
-               (.bind dhcp/SEND-PORT))]
-    (client-message-handler cfg nil server-addr)))
+        cfg {:if-name if-name
+             :hw-addr (fields/mac->octet hw-addr)
+             :server-ip server-ip
+             :server-addr (fields/ip->octet server-ip)
+             :sock sock
+             :state (atom {:assigned? false
+                           :last-tx-ts 0})}]
+    (println (str "Binding to " if-name " (" hw-addr ")"))
+    ;; To listen before we have an address, we need pcap
+    (doto sock
+      (.on "listening" (fn []
+                         (println "Listening on port" dhcp/SEND-PORT)
+                         (socket/bind-to-device sock if-name)
+                         #_(socket/freebind sock)
+                         (.setBroadcast sock true)))
+      (.bind dhcp/SEND-PORT server-ip))
+    (if unicast
+      (doto sock
+        (.on "message" (fn [msg rinfo]
+                         (client-message-handler cfg msg))))
+      (start-pcap-listener cfg))
+    (js/setInterval #(tick cfg) 1000)))

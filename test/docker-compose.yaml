@@ -1,0 +1,57 @@
+version: "2.4"
+
+x-service-base: &service-base
+  cap_add: [NET_ADMIN, NET_RAW, NET_BROADCAST, NET_BIND_SERVICE, SYS_ADMIN]
+  security_opt: [ 'apparmor:unconfined' ] # needed on Ubuntu 18.04
+  network_mode: none
+  image: clj-protocol-test
+  build:
+    dockerfile: test/Dockerfile.node
+    context: ../
+  volumes:
+    - ../build:/root/app/build:ro
+    - ../.shadow-cljs:/root/app/.shadow-cljs:ro
+
+services:
+  net:
+    image: lonocloud-docker.docker.artifactory.viasat.com/graphite-conlink:20210602_171804-geafd988b044f
+    pid: host
+    network_mode: none
+    cap_add: [SYS_ADMIN, SYS_NICE, NET_ADMIN, NET_BROADCAST]
+    security_opt: [ 'apparmor:unconfined' ] # needed on Ubuntu 18.04
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker:/var/lib/docker
+      - ./:/test
+    command: /sbin/conlink.py --compose-file /test/docker-compose.yaml
+    x-network:
+      links:
+        - left:  {container: svr_1, intf: eth0, ip: 10.0.0.1/24}
+          right: {container: net_1, intf: svr}
+
+        - {left: {container: cli_1, intf: eth0}, right: {container: net_1, intf: c1}}
+        - {left: {container: cli_2, intf: eth0}, right: {container: net_1, intf: c2}}
+        - {left: {container: cli_3, intf: eth0}, right: {container: net_1, intf: c3}}
+
+        - {left: {container: ucli_1, intf: eth0, ip: 10.0.0.10/24}, right: {container: net_1, intf: uc1}}
+      mininet-cfg:
+        switches:
+          - name: s1
+        interfaces:
+          - {name: svr, node: s1}
+          - {name: c1,  node: s1}
+          - {name: c2,  node: s1}
+          - {name: c3,  node: s1}
+          - {name: uc1,  node: s1}
+
+  svr:
+    <<: *service-base
+    command: /root/app/init.sh /root/app/build/server.js eth0
+  cli:
+    <<: *service-base
+    scale: 3
+    command: /root/app/init.sh /root/app/build/client.js eth0
+  ucli:
+    <<: *service-base
+    command: /root/app/init.sh /root/app/build/client.js --unicast eth0

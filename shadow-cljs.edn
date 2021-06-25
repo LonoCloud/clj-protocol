@@ -9,7 +9,9 @@
  {:client
   {:target :node-script
    :main dhcp.node-client/main
-   :output-to "client.js"
+   :output-to "build/client.js"
+   ;; Don't try and connect back to shadow-cljs process
+   :devtools {:enabled false :console-support false}
 
    :compiler-options
    {:optimizations :simple
@@ -18,7 +20,9 @@
   :server
   {:target :node-script
    :main dhcp.json-pool-server/main
-   :output-to "server.js"
+   :output-to "build/server.js"
+   ;; Don't try and connect back to shadow-cljs process
+   :devtools {:enabled false :console-support false}
 
    :compiler-options
    {:optimizations :simple
@@ -26,7 +30,7 @@
 
   :test
   {:target :node-test
-   :output-to "protocol-test.js"
+   :output-to "build/test.js"
 
    :compiler-options
    {:optimizations :simple

@@ -13,20 +13,20 @@
 
 ;; https://datatracker.ietf.org/doc/html/rfc3046
 (def OPTS-RELAY-AGENT-LIST
-  ;; code, type, name
-  [[0x01  :circuit-id     :raw]
-   [0x02  :remote-id      :raw]
-   [0x06  :subscriber-id  :str]])
+  ;; code, name, type
+  [[0x01  :circuit-id     :raw   ]
+   [0x02  :remote-id      :raw   ]
+   [0x06  :subscriber-id  :str   ]])
 (def OPTS-RELAY-AGENT-LOOKUP (tlvs/tlv-list->lookup OPTS-RELAY-AGENT-LIST))
 
 (def OPTS-ETHERBOOT-LIST
-  ;; code, type, name
-  [[0x01  :eb-priority      :uint8]
-   [0x08  :eb-yi-addr       :raw]
-   [0x51  :eb-scriptlet     :raw]
-   [0xb2  :eb-use-cached    :uint8]
-   [0xbe  :eb-username      :str]
-   [0xbf  :eb-password      :str]])
+  ;; code, name, type
+  [[0x01  :eb-priority    :uint8 ]
+   [0x08  :eb-yi-addr     :raw   ]
+   [0x51  :eb-scriptlet   :raw   ]
+   [0xb2  :eb-use-cached  :uint8 ]
+   [0xbe  :eb-username    :str   ]
+   [0xbf  :eb-password    :str   ]])
 (def OPTS-ETHERBOOT-LOOKUP (tlvs/tlv-list->lookup OPTS-ETHERBOOT-LIST))
 
 ;; https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
@@ -36,11 +36,13 @@
     [[53  :opt/msg-type          :msg-type     nil ] ;; Typically sent first
      [1   :opt/netmask           :ipv4         nil ]
      [3   :opt/router            :ipv4         nil ]
+     [4   :opt/time-servers      :ipv4set      nil ]
      [6   :opt/dns-servers       :ipv4set      nil ]
-     [12  :opt/hostname          :raw          nil ]
-     [15  :opt/domainname        :raw          nil ]
+     [12  :opt/hostname          :str          nil ]
+     [15  :opt/domainname        :str          nil ]
+     [28  :opt/mtu               :uint16       nil ]
      [28  :opt/broadcast         :ipv4         nil ]
-     [41  :opt/nis-servers       :raw          nil ]
+     [41  :opt/nis-servers       :ipv4set      nil ]
      [43  :opt/vend-spec-info    :raw          nil ]
      [50  :opt/addr-req          :ipv4         nil ]
      [51  :opt/lease-time        :uint32       nil ]
@@ -48,7 +50,7 @@
      [55  :opt/parm-list         :raw          nil ]
      [58  :opt/renew-time        :uint32       nil ]
      [59  :opt/rebind-time       :uint32       nil ]
-     [60  :opt/class-id          :raw          nil ]
+     [60  :opt/vendor-class-id   :raw          nil ]
      [61  :opt/client-id         :raw          nil ]
      [67  :opt/bootfile          :str          nil ]
      [82  :opt/relay-agent-info  :tlv-map-1-1  OPTS-RELAY-AGENT-LOOKUP ]
@@ -64,7 +66,12 @@
       [[255 :opt/end             :stop        nil ]])))
 (def OPTS-LOOKUP (tlvs/tlv-list->lookup OPTS-LIST))
 
+
+
 ;; https://datatracker.ietf.org/doc/html/rfc2131
+(def DHCP-FLAGS [[:broadcast  :bool   1]
+                 [:reserved   :int   15]])
+
 (def DHCP-HEADER
 ;;  name,          type,    length,  default,                 lookup
   [[:op            :uint8        1     0                      nil]
@@ -73,7 +80,7 @@
    [:hops          :uint8        1     0                      nil]
    [:xid           :uint32       4     0                      nil]
    [:secs          :uint16       2     0                      nil]
-   [:flags         :uint16       2     0                      nil]
+   [:flags         :bitfield     2     nil                    DHCP-FLAGS]
    [:ciaddr        :ipv4         4     [0 0 0 0]              nil]
    [:yiaddr        :ipv4         4     [0 0 0 0]              nil]
    [:siaddr        :ipv4         4     [0 0 0 0]              nil] ;; next server
@@ -157,10 +164,11 @@
     (merge
       DHCP-DEFAULTS
       (select-keys msg-map [:xid :secs :chaddr])
-      {:op 2 ;; DHCP response
-       :flags (if (get MSG-TYPE-BCAST-LOOKUP msg-type) 0x8000 0)
-       :opt/msg-type (get MSG-TYPE-RESP-LOOKUP msg-type)
-       :opt/lease-time (* 60 60 24) ;; default to 1 day
+      {:op                 2 ;; DHCP response
+       :flags              {:broadcast (get MSG-TYPE-BCAST-LOOKUP msg-type)
+                            :reserved 0}
+       :opt/msg-type       (get MSG-TYPE-RESP-LOOKUP msg-type)
+       :opt/lease-time     (* 60 60 24) ;; default to 1 day
        :siaddr             (:address srv-if)
        :opt/netmask        (:netmask srv-if)
        :opt/router         (:address srv-if)

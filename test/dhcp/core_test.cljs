@@ -31,7 +31,7 @@
   {
    :op 2, :htype 1, :hlen 6, :hops 0,
    :xid 7,
-   :secs 8, :flags 0,
+   :secs 8, :flags {:broadcast false :reserved 0},
    :ciaddr [0 0 0 0],
    :yiaddr [0 0 0 0],
    :siaddr [0 0 0 0],

@@ -63,25 +63,60 @@
 (defn ip-seq [start end]
   (map int->ip (range (ip->int start) (+ 1 (ip->int end)))))
 
+(defn bytes->bits [byts]
+  (mapcat #(map js/parseInt
+                (take-last 8 (seq (str "00000000" (.toString % 2)))))
+          byts))
+
+(defn bits->bytes [bits]
+  (map #(js/parseInt (apply str %) 2)
+       (partition 8 bits)))
+
+#_(defn parts [parts coll]
+  (first
+    (reduce (fn [[r c] p] [(conj r (take p c)) (drop p c)])
+            [[] coll] parts)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Field readers and writers
 
 (set! *warn-on-infer* false)
 
-(def readers
-  {:buf      #(.slice %1 %2 %3)
-   :raw      #(vec (.slice %1 %2 %3))
-   :str      #(string/replace (.toString %1 "utf8" %2 %3) "\u0000" "")
-   :uint8    #(.readUInt8 %1 %2)
-   :uint16   #(.readUInt16BE %1 %2)
-   :uint32   #(.readUInt32BE %1 %2)
-   :uint64   #(.readBigUInt64BE %1 %2)
-   :ipv4     #(vec (.slice %1 %2 (+ 4 %2)))
-   :mac      #(vec (.slice %1 %2 (+ 6 %2)))})
+(defn bytes->bitfield [byts spec]
+  (let [bits (bytes->bits byts)]
+    (first
+      (reduce (fn [[res bs] [nam typ len]]
+                ;;(prn :res res :bs bs :name nam :typ typ :len len)
+                (let [i (js/parseInt (apply str (take len bs)) 2)]
+                  [(assoc res nam (condp = typ :int i :bool (> i 0)))
+                   (drop len bs)]))
+              [{} bits] spec))))
 
-(defn arr-fill [dbuf arr off cnt]
-  (let [tend (+ off cnt)]
+(defn bitfield->bytes [bmap spec]
+  (bits->bytes
+    (reduce (fn [res [nam typ len]]
+              (let [i (let [i (get bmap nam 0)] (get {true 1 false 0} i i))
+                    bs (take-last len (concat (repeat len "0")
+                                              (.toString i 2)))]
+                (into res bs)))
+            [] spec)))
+
+;; Called with [buf start end readers arg/lookup]
+;; Return value read
+(def readers
+  {:buf       #(.slice %1 %2 %3)
+   :raw       #(vec (.slice %1 %2 %3))
+   :str       #(string/replace (.toString %1 "utf8" %2 %3) "\u0000" "")
+   :uint8     #(.readUInt8 %1 %2)
+   :uint16    #(.readUInt16BE %1 %2)
+   :uint32    #(.readUInt32BE %1 %2)
+   :uint64    #(.readBigUInt64BE %1 %2)
+   :ipv4      #(vec (.slice %1 %2 (+ 4 %2)))
+   :mac       #(vec (.slice %1 %2 (+ 6 %2)))
+   :bitfield  #(bytes->bitfield (vec (.slice %1 %2 %3)) %5)})
+
+(defn arr-fill [dbuf arr off & [cnt]]
+  (let [tend (+ off (or cnt (count arr)))]
     (.fill dbuf (.from js/Buffer (clj->js arr)) off tend)
     tend))
 
@@ -90,15 +125,17 @@
     (.fill dbuf sbuf off tend)
     tend))
 
-;; Returns offset after written value
+;; Called with [buf value start writers arg/lookup]
+;; Returns offset/end after written value
 (def writers
-  {:buf      #(buf-fill %1 %2 %3)
-   :raw      #(arr-fill %1 %2 %3 (count %2))
-   :str      #(do (.write %1 %2 %3 "utf8") (+ (.-length %2) %3))
-   :uint8    #(.writeUInt8 %1 %2 %3)
-   :uint16   #(.writeUInt16BE %1 %2 %3)
-   :uint32   #(.writeUInt32BE %1 %2 %3)
-   :uint64   #(.writeBigUInt64BE %1 %2 %3)
-   :ipv4     #(arr-fill %1 %2 %3 4)
-   :mac      #(arr-fill %1 %2 %3 6)})
+  {:buf       #(buf-fill %1 %2 %3)
+   :raw       #(arr-fill %1 %2 %3)
+   :str       #(do (.write %1 %2 %3 "utf8") (+ (.-length %2) %3))
+   :uint8     #(.writeUInt8 %1 %2 %3)
+   :uint16    #(.writeUInt16BE %1 %2 %3)
+   :uint32    #(.writeUInt32BE %1 %2 %3)
+   :uint64    #(.writeBigUInt64BE %1 %2 %3)
+   :ipv4      #(arr-fill %1 %2 %3 4)
+   :mac       #(arr-fill %1 %2 %3 6)
+   :bitfield  #(arr-fill %1 (bitfield->bytes %2 %5) %3)})
 

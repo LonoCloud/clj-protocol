@@ -15,36 +15,42 @@
 
 (deftest test-readers
   (println "  test-readers")
-  (let [buf (.from js/Buffer (clj->js [65 66 67 68 69 70 71 72 73 74]))]
-    (doseq [[t v] {:str "CDEF"
-                   :uint8 67
-                   :uint16 17220
-                   :uint32 1128547654
-                   :uint64 (js/BigInt "4847075267103443274")
-                   :ipv4 [67 68 69 70]
-                   :mac [67 68 69 70 71 72]}]
+  (let [buf (.from js/Buffer (clj->js [65 66 67 68 69 70 71 72 73 74]))
+        bit-spec [[:a :int 10] [:b :bool 1] [:c :bool 3] [:d :int 18]]]
+    (doseq [
+            [t v] {:str       "CDEF"
+                   :uint8     67
+                   :uint16    17220
+                   :uint32    1128547654
+                   :uint64    (js/BigInt "4847075267103443274")
+                   :ipv4      [67 68 69 70]
+                   :mac       [67 68 69 70 71 72]
+                   :bitfield  {:a 269, :b false, :c true, :d 17734}}]
       (println "    reader" t)
-      (let [res ((fields/readers t) buf 2 6)]
+      (let [res ((fields/readers t) buf 2 6 fields/readers bit-spec)]
         (is res)
         (is (= v res))))))
 
 (deftest test-writers
   (println "  test-writers")
-  (doseq [[t [v1 v2 v3]]
-          {:str    ["CDEF"              4 [0 0 67 68 69 70  0  0  0  0]]
-           :uint8  [67                  1 [0 0 67  0  0  0  0  0  0  0]]
-           :uint16 [17220               2 [0 0 67 68  0  0  0  0  0  0]]
-           :uint32 [1128547654          4 [0 0 67 68 69 70  0  0  0  0]]
-           :uint64 [(js/BigInt "4847075267103443274")
-                                        8 [0 0 67 68 69 70 71 72 73 74]]
-           :ipv4   [[67 68 69 70]       4 [0 0 67 68 69 70  0  0  0  0]]
-           :mac    [[67 68 69 70 71 72] 6 [0 0 67 68 69 70 71 72  0  0]]}]
-    (println "    writer" t v1 v2 v3)
-    (let [buf (.alloc js/Buffer 10)
-          sz ((fields/writers t) buf v1 2 6)
-          octs (vec (.slice buf 0))]
-      (is (> sz 0))
-      (is (= v3 octs)))))
+  (let [bit-spec [[:a :int 10] [:b :bool 1] [:c :bool 3] [:d :int 18]]]
+    (doseq [[t [v1 v2 v3]]
+            {:str       ["CDEF"              4 [0 0 67 68 69 70  0  0  0  0]]
+             :uint8     [67                  1 [0 0 67  0  0  0  0  0  0  0]]
+             :uint16    [17220               2 [0 0 67 68  0  0  0  0  0  0]]
+             :uint32    [1128547654          4 [0 0 67 68 69 70  0  0  0  0]]
+             :uint64    [(js/BigInt "4847075267103443274")
+                                             8 [0 0 67 68 69 70 71 72 73 74]]
+             :ipv4      [[67 68 69 70]       4 [0 0 67 68 69 70  0  0  0  0]]
+             :mac       [[67 68 69 70 71 72] 6 [0 0 67 68 69 70 71 72  0  0]]
+             :bitfield  [{:a 269, :b false, :c true, :d 17734}
+                                             4 [0 0 67 68 69 70  0  0  0  0]]}]
+      (println "    writer" t v1 v2 v3)
+      (let [buf (.alloc js/Buffer 10)
+            sz ((fields/writers t) buf v1 2 fields/writers bit-spec)
+            octs (vec (.slice buf 0))]
+        (is (> sz 0))
+        (is (= v3 octs))))))
 
 (deftest test-string-readers-writers
   (println "  test-string-readers-writers")

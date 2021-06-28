@@ -13,16 +13,16 @@
 (def TLV-LOOKUP (tlvs/tlv-list->lookup TLV-LIST))
 
 (def HEADER-1
-  ;; name,  type,         length,  default,  lookup
-  [[:op     :uint8        1        0         nil        ]
-   [:xid    :uint32       4        0         nil        ]
-   [:INTO   :tlv-seq-1-1  :*       nil       TLV-LOOKUP ]])
+  ;; name,  type,         length,  default,  args
+  [[:op     :uint8        1        0         nil         nil]
+   [:xid    :uint32       4        0         nil         nil]
+   [:tlvs   :tlv-map      :*       nil       [TLV-LOOKUP 1 1]]])
 
 (def HEADER-2
-  ;; name,  type,         length,  default,  lookup
-  [[:op     :uint16       2        0         nil        ]
-   [:host   :str          6        "abcdef"  nil        ]
-   [:tlvs   :tlv-seq-2-2  :*       nil       TLV-LOOKUP ]])
+  ;; name,  type,         length,  default,  args
+  [[:op     :uint16       2        0         nil         nil]
+   [:host   :str          6        "abcdef"  nil         nil]
+   [:tlvs   :tlv-seq      :*       nil       [TLV-LOOKUP 2 2]]])
 
 (def MSG-TYPE-LIST [[1 :MSG1] [2 :MSG2]])
 (def MSG-TYPE-LOOKUP
@@ -58,9 +58,9 @@
 (def TEST-MSG-1-BUF (parse-raw-msg TEST-MSG-1-STR))
 (def TEST-MSG-1-MAP {:op 1
                      :xid 2
-                     :tlv/msg-type :MSG1
-                     :tlv/address [6 7 8 9]
-                     :tlv/hostname "ABCDE"})
+                     :tlvs {:tlv/msg-type :MSG1
+                            :tlv/address [6 7 8 9]
+                            :tlv/hostname "ABCDE"}})
 
 (def TEST-MSG-2-STR
   "00 03

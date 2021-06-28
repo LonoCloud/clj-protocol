@@ -2,46 +2,52 @@
 
 ;; https://en.wikipedia.org/wiki/Type%E2%80%93length%E2%80%93value
 
-;; list of [code, internal type, name]
+;; list of [code, name, internal type, lookup, args]
 (defn tlv-list->lookup [tlist]
   {:list tlist
-   :types (merge (into {} (map (fn [[c n t l]] [c t]) tlist))
-                 (into {} (map (fn [[c n t l]] [n t]) tlist)))
-   :lookup (merge (into {} (map (fn [[c n t l]] [c l]) tlist))
-                  (into {} (map (fn [[c n t l]] [n l]) tlist)))
-   :names (into {} (map (fn [[c n t l]] [n c]) tlist))
-   :codes (into {} (map (fn [[c n t l]] [c n]) tlist))})
+   :types  (merge (into {} (map (fn [[c n t a]] [c t]) tlist))
+                  (into {} (map (fn [[c n t a]] [n t]) tlist)))
+   :args   (merge (into {} (map (fn [[c n t a]] [c a]) tlist))
+                  (into {} (map (fn [[c n t a]] [n a]) tlist)))
+   :names (into {} (map (fn [[c n t a]] [n c]) tlist))
+   :codes (into {} (map (fn [[c n t a]] [c n]) tlist))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV readers
 
 (defn read-tlv
-  [ctype clen ltype llen buf start readers tlv-lookup]
-  (let [code ((readers ctype) buf start)
+  "If the args for the current field type value start with ':self'
+  then the current value of tlv-lookup will be substituted. This
+  TLV fields to contain TLV fields that use the same definition/lookup."
+  [buf start readers tlv-lookup clen llen]
+  (let [ctype (get {1 :uint8 2 :uint16} clen)
+        ltype (get {1 :uint8 2 :uint16} llen)
+        code ((readers ctype) buf start)
         ttype (get-in tlv-lookup [:types code])
-        tlookup (or (get-in tlv-lookup [:lookup code]) tlv-lookup)]
+        targs (get-in tlv-lookup [:args code])
+        targs (if (or (not targs) (= :self (first targs)))
+                (cons tlv-lookup (drop 1 targs))
+                targs)]
     (when (not ttype)
       (println (str "WARNING: No TLV reader for " code " treating as :raw")))
     (if (= :stop ttype)
       [code ttype 0 0]
       (let [len ((readers ltype) buf (+ clen start))
-            end (+ clen llen len start)
+            vstart (+ clen llen start)
+            vend   (+ clen llen start len)
             reader (readers (or ttype :raw))
-            value (reader buf (+ clen llen start) end readers tlookup)]
+            value (apply reader buf vstart  vend readers targs)]
         [code ttype len value]))))
 
-(def read-tlv-1-1 (partial read-tlv :uint8  1 :uint8 1))
-(def read-tlv-2-2 (partial read-tlv :uint16 2 :uint16 2))
-
 (defn read-tlv-seq
-  [ctype clen ltype llen buf tlv-start tlv-end readers tlv-lookup]
+  [buf tlv-start tlv-end readers tlv-lookup clen llen]
   (let [{:keys [types codes] :as lookup} tlv-lookup]
     (loop [res []
            tstart tlv-start]
       (if (>= tstart tlv-end)
         res
-        (let [[tcode ttype tlen value] (read-tlv ctype clen ltype llen
-                                                 buf tstart readers tlv-lookup)
+        (let [[tcode ttype tlen value] (read-tlv buf tstart readers
+                                                 tlv-lookup clen llen)
               tend (+ clen llen tlen tstart)
               tname (get codes tcode tcode)
               res (conj res [tname value])]
@@ -49,66 +55,59 @@
             res
             (recur res tend)))))))
 
-(def read-tlv-seq-1-1 (partial read-tlv-seq :uint8  1 :uint8  1))
-(def read-tlv-seq-2-2 (partial read-tlv-seq :uint16 2 :uint16 2))
-
 ;;;
 
 (defn read-tlv-map
-  [ctype clen ltype llen buf tlv-start tlv-end readers tlv-lookup]
-  (into {} (read-tlv-seq ctype clen ltype llen buf tlv-start tlv-end readers tlv-lookup)))
-
-(def read-tlv-map-1-1 (partial read-tlv-map :uint8  1 :uint8  1))
-(def read-tlv-map-2-2 (partial read-tlv-map :uint16 2 :uint16 2))
+  [buf tlv-start tlv-end readers tlv-lookup clen llen]
+  (into {} (read-tlv-seq buf tlv-start tlv-end readers tlv-lookup clen llen)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV writers
 
 (defn write-tlv
-  [ctype clen ltype llen buf [tname tvalue] start writers tlv-lookup]
+  "If the args for the current field type value start with ':self'
+  then the current value of tlv-lookup will be substituted. This
+  TLV fields to contain TLV fields that use the same definition/lookup."
+  [buf [tname tvalue] start writers tlv-lookup clen llen]
   (let [code (get-in tlv-lookup [:names tname])
         _ (assert code (str "No TLV lookup definition for " tname))
+        ctype (get {1 :uint8 2 :uint16} clen)
+        ltype (get {1 :uint8 2 :uint16} llen)
         vtype (get-in tlv-lookup [:types tname])
-        vlookup (or (get-in tlv-lookup [:lookup tname]) tlv-lookup)
+        vargs (get-in tlv-lookup [:args tname])
+        vargs (if (or (not vargs) (= :self (first vargs)))
+                (cons tlv-lookup (drop 1 vargs))
+                vargs)
         vstart (+ start clen llen)
-        end ((writers ctype) buf code           start)]
+        end ((writers ctype) buf code start)]
     (if (= :stop vtype)
       end
       (let [vwriter (writers vtype)
             _ (assert vwriter (str "No writer for " vtype))
-            end ((writers vtype) buf tvalue         vstart writers vlookup)
+            end (apply vwriter   buf tvalue         vstart writers vargs)
             _   ((writers ltype) buf (- end vstart) (+ clen start))]
         end))))
 
-(def write-tlv-1-1 (partial write-tlv :uint8  1 :uint8  1))
-(def write-tlv-2-2 (partial write-tlv :uint16 2 :uint16 2))
-
 (defn write-tlv-seq
-  [ctype clen ltype llen buf tlvs tlv-start writers tlv-lookup]
+  [buf tlvs tlv-start writers tlv-lookup clen llen]
   (loop [tend tlv-start
          tlvs tlvs]
     (if (not (seq tlvs))
       tend
       (let [tlv (first tlvs)
-            tend (write-tlv ctype clen ltype llen
-                            buf tlv tend writers tlv-lookup)]
+            tend (write-tlv buf tlv tend writers tlv-lookup clen llen)]
         (recur tend (next tlvs))))))
-
-(def write-tlv-seq-1-1 (partial write-tlv-seq :uint8  1 :uint8  1))
-(def write-tlv-seq-2-2 (partial write-tlv-seq :uint16 2 :uint16 2))
 
 ;;;
 
 (defn write-tlv-map
-  [ctype clen ltype llen buf tlvs tlv-start writers tlv-lookup]
+  [buf tlvs tlv-start writers tlv-lookup clen llen]
   (let [tlv-map (into {} tlvs)
         tlvs (for [[c n t l] (:list tlv-lookup)
                    :when (contains? tlv-map n)]
                [n (get tlv-map n)])]
-    (write-tlv-seq ctype clen ltype llen buf tlvs tlv-start writers tlv-lookup)))
+    (write-tlv-seq buf tlvs tlv-start writers tlv-lookup clen llen)))
 
-(def write-tlv-map-1-1 (partial write-tlv-map :uint8  1 :uint8  1))
-(def write-tlv-map-2-2 (partial write-tlv-map :uint16 2 :uint16 2))
 
 ;;; TLV manipulation
 
@@ -144,13 +143,9 @@
 (set! *warn-on-infer* false)
 
 (def readers
-  {:tlv-seq-1-1 read-tlv-seq-1-1
-   :tlv-seq-2-2 read-tlv-seq-2-2
-   :tlv-map-1-1 read-tlv-map-1-1
-   :tlv-map-2-2 read-tlv-map-2-2 })
+  {:tlv-seq read-tlv-seq
+   :tlv-map read-tlv-map })
 
 (def writers
-  {:tlv-seq-1-1 write-tlv-seq-1-1
-   :tlv-seq-2-2 write-tlv-seq-2-2
-   :tlv-map-1-1 write-tlv-map-1-1
-   :tlv-map-2-2 write-tlv-map-2-2})
+  {:tlv-seq write-tlv-seq
+   :tlv-map write-tlv-map})

@@ -4,7 +4,7 @@
             [protocol.fields :as fields]
             [protocol.tlvs :as tlvs]))
 
-(def TLVS-LIST ;; code, type, name
+(def TLVS-LIST ;; code, name, type
                [[1      :a    :tlvs ]
                 [2      :b    :uint8]
                 [3      :c    :tlvs ]
@@ -15,10 +15,10 @@
 
 (def readers (merge fields/readers
                     tlvs/readers
-                    {:tlvs #(tlvs/read-tlv-seq-2-2 %1 %2 %3 readers TLVS-LOOKUP)}))
+                    {:tlvs #(tlvs/read-tlv-seq %1 %2 %3 readers TLVS-LOOKUP 2 2)}))
 (def writers (merge fields/writers
                     tlvs/writers
-                    {:tlvs #(tlvs/write-tlv-seq-2-2 %1 %2 %3 writers TLVS-LOOKUP)}))
+                    {:tlvs #(tlvs/write-tlv-seq %1 %2 %3 writers TLVS-LOOKUP 2 2)}))
 
 
 ;;;

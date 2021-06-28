@@ -59,8 +59,8 @@
 (deftest test-basic-dhcp
   (println "  test-basic-dhcp")
   (let [msg (dhcp/read-dhcp BASIC-MSG-BUF)
+        ;;_ (prn :msg msg)
         buf (dhcp/write-dhcp msg)]
-    ;;(prn :msg msg)
     (is (= BASIC-MSG-MAP msg))
     (is (.compare BASIC-MSG-BUF buf))))
 

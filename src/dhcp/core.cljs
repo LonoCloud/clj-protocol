@@ -31,7 +31,7 @@
 
 ;; https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
 (def OPTS-LIST
-  ;; code,  name,                type          lookup
+  ;; code,  name,                type          args
   (into
     [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
      [1   :opt/netmask           :ipv4         nil]
@@ -53,9 +53,9 @@
      [60  :opt/vendor-class-id   :raw          nil]
      [61  :opt/client-id         :raw          nil]
      [67  :opt/bootfile          :str          nil]
-     [82  :opt/relay-agent-info  :tlv-map-1-1  OPTS-RELAY-AGENT-LOOKUP]
+     [82  :opt/relay-agent-info  :tlv-map      [OPTS-RELAY-AGENT-LOOKUP 1 1]]
      [97  :opt/guid              :raw          nil]
-     [175 :opt/etherboot         :tlv-map-1-1  OPTS-ETHERBOOT-LOOKUP]] ;; gPXE/iPXE
+     [175 :opt/etherboot         :tlv-map      [OPTS-ETHERBOOT-LOOKUP 1 1]]]
 
     (concat
       ;; RFC-3942 site-specific options (224-254)
@@ -73,14 +73,14 @@
                  [:reserved   :int   15]])
 
 (def DHCP-HEADER
-;;  name,          type,    length,  default,                 lookup
+;;  name,          type,    length,  default,                 args
   [[:op            :uint8        1     0                      nil]
    [:htype         :uint8        1     1                      nil]
    [:hlen          :uint8        1     6                      nil]
    [:hops          :uint8        1     0                      nil]
    [:xid           :uint32       4     0                      nil]
    [:secs          :uint16       2     0                      nil]
-   [:flags         :bitfield     2     nil                    DHCP-FLAGS]
+   [:flags         :bitfield     2     nil                    [DHCP-FLAGS]]
    [:ciaddr        :ipv4         4     [0 0 0 0]              nil]
    [:yiaddr        :ipv4         4     [0 0 0 0]              nil]
    [:siaddr        :ipv4         4     [0 0 0 0]              nil] ;; next server
@@ -90,7 +90,7 @@
    [:sname         :str          64    ""                     nil]
    [:opt/bootfile  :str          128   ""                     nil] ;; :file
    [:cookie        :raw          4     [99 130 83 99]         nil]
-   [:INTO          :tlv-map-1-1  :*    nil                    OPTS-LOOKUP]])
+   [:options       :tlv-map      :*    nil                    [OPTS-LOOKUP 1 1]]])
 
 (def HEADERS-FIXED {:htype  1
                     :hlen   6
@@ -113,7 +113,7 @@
 
 (def DHCP-DEFAULTS
   (into {} (for [[fname  _ _ fdefault _] DHCP-HEADER
-                 :when (not= :INTO fname)]
+                 :when fdefault]
              [fname fdefault])))
 
 (def MSG-TYPE-LOOKUP
@@ -129,15 +129,31 @@
 
 (set! *warn-on-infer* false)
 
+(defn read-dhcp* [buf start end readers & args]
+  ;; Merge options up into the top level map
+  (let [msg-map (header/read-header buf start end readers DHCP-HEADER)
+        options (:options msg-map)]
+    (dissoc (merge msg-map options)
+            :options
+            :opt/end)))
+
+(defn write-dhcp* [buf msg-map start writers & args]
+  ;; Move options down into :options keys
+  (let [options (into {:opt/end 0}
+                      (for [fname (map second OPTS-LIST)
+                            :when (contains? msg-map fname)]
+                        [fname (get msg-map fname)]))
+        msg-map (merge msg-map HEADERS-FIXED {:options options})
+        buf (if buf buf (.alloc js/Buffer MAX-BUF-SIZE))]
+    (header/write-header buf msg-map start writers DHCP-HEADER)))
+
 (def readers
   (merge
     fields/readers
     tlvs/readers
     {:ipv4set  #(set (partition 4 ((fields/readers :raw) %1 %2 %3)))
      :msg-type #(get MSG-TYPE-LOOKUP (.readUInt8 %1 %2))
-     :dhcp #(dissoc
-              (header/read-header %1 %2 %3 readers DHCP-HEADER)
-              :opt/end)}))
+     :dhcp read-dhcp*}))
 
 (def writers
   (merge
@@ -145,17 +161,15 @@
     tlvs/writers
     {:ipv4set  #((fields/writers :raw) %1 (apply concat %2) %3)
      :msg-type #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)
-     :dhcp #(let [msg-map (merge %2 HEADERS-FIXED {:opt/end 0})
-                  buf (if %1 %1 (.alloc js/Buffer MAX-BUF-SIZE))]
-              (header/write-header buf msg-map %3 writers DHCP-HEADER))}))
+     :dhcp write-dhcp*}))
 
 ;;;
 
 (set! *warn-on-infer* true)
 
-(defn read-dhcp [buf]      ((readers :dhcp) buf 0 (.-length buf)))
+(defn read-dhcp [buf]      ((readers :dhcp) buf 0 (.-length buf) readers))
 
-(defn write-dhcp [msg-map] ((writers :dhcp) nil msg-map 0 nil))
+(defn write-dhcp [msg-map] ((writers :dhcp) nil msg-map 0 writers))
 
 
 (defn default-response [msg-map srv-if]

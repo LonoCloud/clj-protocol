@@ -31,7 +31,7 @@
 
 ;; https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
 (def OPTS-LIST
-  ;; code,  name,                type          args
+  ;; code,  name,                type          extra context
   (into
     [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
      [1   :opt/netmask           :ipv4         nil]
@@ -53,9 +53,9 @@
      [60  :opt/vendor-class-id   :raw          nil]
      [61  :opt/client-id         :raw          nil]
      [67  :opt/bootfile          :str          nil]
-     [82  :opt/relay-agent-info  :tlv-map      [OPTS-RELAY-AGENT-LOOKUP 1 1]]
+     [82  :opt/relay-agent-info  :tlv-map      {:lookup OPTS-RELAY-AGENT-LOOKUP}]
      [97  :opt/guid              :raw          nil]
-     [175 :opt/etherboot         :tlv-map      [OPTS-ETHERBOOT-LOOKUP 1 1]]]
+     [175 :opt/etherboot         :tlv-map      {:lookup OPTS-ETHERBOOT-LOOKUP}]]
 
     (concat
       ;; RFC-3942 site-specific options (224-254)
@@ -73,14 +73,14 @@
                  [:reserved   :int   15]])
 
 (def DHCP-HEADER
-;;  name,          type,    length,  default,                 args
+;;  name,          type,    length,  default,                 extra-context
   [[:op            :uint8        1     0                      nil]
    [:htype         :uint8        1     1                      nil]
    [:hlen          :uint8        1     6                      nil]
    [:hops          :uint8        1     0                      nil]
    [:xid           :uint32       4     0                      nil]
    [:secs          :uint16       2     0                      nil]
-   [:flags         :bitfield     2     nil                    [DHCP-FLAGS]]
+   [:flags         :bitfield     2     nil                    {:spec DHCP-FLAGS}]
    [:ciaddr        :ipv4         4     [0 0 0 0]              nil]
    [:yiaddr        :ipv4         4     [0 0 0 0]              nil]
    [:siaddr        :ipv4         4     [0 0 0 0]              nil] ;; next server
@@ -90,7 +90,9 @@
    [:sname         :str          64    ""                     nil]
    [:opt/bootfile  :str          128   ""                     nil] ;; :file
    [:cookie        :raw          4     [99 130 83 99]         nil]
-   [:options       :tlv-map      :*    nil                    [OPTS-LOOKUP 1 1]]])
+   [:options       :tlv-map      :*    nil                    {:tlv-tsize 1
+                                                               :tlv-lsize 1
+                                                               :lookup OPTS-LOOKUP}]])
 
 (def HEADERS-FIXED {:htype  1
                     :hlen   6
@@ -131,7 +133,7 @@
 
 (defn read-dhcp* [buf start end readers & args]
   ;; Merge options up into the top level map
-  (let [msg-map (header/read-header buf start end readers DHCP-HEADER)
+  (let [msg-map (header/read-header buf start end {:readers readers :spec DHCP-HEADER})
         options (:options msg-map)]
     (dissoc (merge msg-map options)
             :options
@@ -145,7 +147,7 @@
                         [fname (get msg-map fname)]))
         msg-map (merge msg-map HEADERS-FIXED {:options options})
         buf (if buf buf (.alloc js/Buffer MAX-BUF-SIZE))]
-    (header/write-header buf msg-map start writers DHCP-HEADER)))
+    (header/write-header buf msg-map start {:writers writers :spec DHCP-HEADER})))
 
 (def readers
   (merge

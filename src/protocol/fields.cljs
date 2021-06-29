@@ -16,6 +16,8 @@
   (let [h (js/Number.prototype.toString.call i 16)]
     (if (= 1 (.-length h)) (str "0" h) h)))
 
+;;;
+
 (defn bytes->bits [byts]
   (mapcat #(map js/parseInt
                 (take-last 8 (seq (str "00000000" (.toString % 2)))))
@@ -51,7 +53,7 @@
 
 (def remove-null-re (js/RegExp. "\u0000" "g"))
 
-;; Called with [buf start end readers arg/lookup]
+;; Called with [buf start end ctx]
 ;; Return value read
 (def readers
   {:buf       #(.slice %1 %2 %3)
@@ -63,7 +65,7 @@
    :uint64    #(.readBigUInt64BE %1 %2)
    :ipv4      #(vec (.slice %1 %2 (+ 4 %2)))
    :mac       #(vec (.slice %1 %2 (+ 6 %2)))
-   :bitfield  #(bytes->bitfield (vec (.slice %1 %2 %3)) %5)})
+   :bitfield  #(bytes->bitfield (vec (.slice %1 %2 %3)) (:spec %4))})
 
 (defn arr-fill [dbuf arr off & [cnt]]
   (let [tend (+ off (or cnt (count arr)))]
@@ -75,7 +77,7 @@
     (.fill dbuf sbuf off tend)
     tend))
 
-;; Called with [buf value start writers arg/lookup]
+;; Called with [buf value start ctx]
 ;; Returns offset/end after written value
 (def writers
   {:buf       #(buf-fill %1 %2 %3)
@@ -87,5 +89,5 @@
    :uint64    #(.writeBigUInt64BE %1 %2 %3)
    :ipv4      #(arr-fill %1 %2 %3 4)
    :mac       #(arr-fill %1 %2 %3 6)
-   :bitfield  #(arr-fill %1 (bitfield->bytes %2 %5) %3)})
+   :bitfield  #(arr-fill %1 (bitfield->bytes %2 (:spec %4)) %3)})
 

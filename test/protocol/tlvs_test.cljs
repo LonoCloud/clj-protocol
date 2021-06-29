@@ -4,21 +4,23 @@
             [protocol.fields :as fields]
             [protocol.tlvs :as tlvs]))
 
-(def TLVS-LIST ;; code, name, type
-               [[1      :a    :tlvs ]
-                [2      :b    :uint8]
-                [3      :c    :tlvs ]
-                [4      :d    :tlvs ]
-                [5      :e    :raw  ]])
+(def TLVS-LIST ;; code, name, type,      extra-context
+               [[1      :a    :tlv-seq   ]
+                [2      :b    :uint8     ]
+                [3      :c    :tlv-seq   ]
+                [4      :d    :tlv-seq   {:tlv-tsize 1
+                                          :tlv-lsize 1}]
+                [5      :e    :raw       ]
+                [6      :f    :bitfield  {:spec [[:bflag1  :bool   1]
+                                                 [:iflag2  :int   12]
+                                                 [:iflag3  :int    3]]}]])
 
 (def TLVS-LOOKUP (tlvs/tlv-list->lookup TLVS-LIST))
 
 (def readers (merge fields/readers
-                    tlvs/readers
-                    {:tlvs #(tlvs/read-tlv-seq %1 %2 %3 readers TLVS-LOOKUP 2 2)}))
+                    tlvs/readers))
 (def writers (merge fields/writers
-                    tlvs/writers
-                    {:tlvs #(tlvs/write-tlv-seq %1 %2 %3 writers TLVS-LOOKUP 2 2)}))
+                    tlvs/writers))
 
 
 ;;;
@@ -31,33 +33,65 @@
   [[:a [[:b 2]
         [:b 3]]]
    [:c [[:d [[:e [1 2 3]]
-             [:b 4]]]]]])
+             [:b 4]]]]]
+   [:f {:bflag1 true
+        :iflag2 1365
+        :iflag3 2}]])
 
 (def TLV-TEST-1-BUF
-  (parse-raw-msg "00 00 00 01 00 0a 00 02 00 01 02 00 02 00 01 03 00 03 00 10 00 04 00 0c 00 05 00 03 01 02 03 00 02 00 01 04"))
+  (parse-raw-msg
+    "00 00
+    00 01 00 0a
+       00 02 00 01 02
+       00 02 00 01 03
+    00 03 00 0c
+       00 04 00 08
+          05 03 01 02 03
+          02 01 04
+    00 06 00 02 aa aa"))
 
 (def TLV-TEST-1-ASSOC-A-B
   [[:a [[:b 7]
         [:b 7]]]
    [:c [[:d [[:e [1 2 3]]
-             [:b 4]]]]]])
+             [:b 4]]]]]
+   [:f {:bflag1 true
+        :iflag2 1365
+        :iflag3 2}]])
 
 (def TLV-TEST-1-INC-A-B
   [[:a [[:b 3]
         [:b 4]]]
    [:c [[:d [[:e [1 2 3]]
-             [:b 4]]]]]])
+             [:b 4]]]]]
+   [:f {:bflag1 true
+        :iflag2 1365
+        :iflag3 2}]])
 
 (def TLV-TEST-1-CONJ-E
-  [[:a [[:b 2] [:b 3]]]
-   [:c [[:d [[:e [1 2 3 7]] [:b 4]]]]]])
+  [[:a [[:b 2]
+        [:b 3]]]
+   [:c [[:d [[:e [1 2 3 7]]
+             [:b 4]]]]]
+   [:f {:bflag1 true
+        :iflag2 1365
+        :iflag3 2}]])
+
+(def TLV-TEST-1-CTX
+  {:lookup TLVS-LOOKUP
+   :tlv-tsize 2
+   :tlv-lsize 2
+   :readers readers
+   :writers writers})
 
 (deftest test-tlv-roundtrip
   (println "  test-tlv-roundtrip")
   (let [buf (.alloc js/Buffer 1500)
-        end ((writers :tlvs) buf TLV-TEST-1 2)
+        end ((writers :tlv-seq) buf TLV-TEST-1 2 TLV-TEST-1-CTX)
         res-buf (.slice buf 0 end)
-        res-msg ((readers :tlvs) res-buf 2 end)]
+        res-msg ((readers :tlv-seq) res-buf 2 end TLV-TEST-1-CTX)]
+    ;;(js/console.log "orig BUF:" TLV-TEST-1-BUF)
+    ;;(js/console.log "res  BUF:" res-buf)
     (is (= 0 (.compare TLV-TEST-1-BUF res-buf)))
     (is (= TLV-TEST-1 res-msg))))
 

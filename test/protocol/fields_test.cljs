@@ -29,7 +29,7 @@
                    :mac       [67 68 69 70 71 72]
                    :bitfield  {:a 269, :b false, :c true, :d 17734}}]
       (println "    reader" t)
-      (let [res ((freaders t) buf 2 6 freaders bit-spec)]
+      (let [res ((freaders t) buf 2 6 {:readers freaders :spec bit-spec})]
         (is res)
         (is (= v res))))))
 
@@ -49,7 +49,7 @@
                                              4 [0 0 67 68 69 70  0  0  0  0]]}]
       (println "    writer" t v1 v2 v3)
       (let [buf (.alloc js/Buffer 10)
-            sz ((fwriters t) buf v1 2 fwriters bit-spec)
+            sz ((fwriters t) buf v1 2 {:writers fwriters :spec bit-spec})
             octs (vec (.slice buf 0))]
         (is (> sz 0))
         (is (= v3 octs))))))

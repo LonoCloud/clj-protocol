@@ -23,6 +23,13 @@
         (recur header-def fend res)
         res))))
 
+(defn get-end
+  [buf msg-map offset flen & [res]]
+  (cond (number? flen)  (+ offset flen)
+        (= :*    flen)  (if res res (.-length buf))
+        (fn?     flen)  (+ offset (flen buf msg-map offset))
+        :else           (+ offset (get msg-map flen))))
+
 (defn read-header
   "Takes [buf start end readers header-def] and parses 'buf' based on
   'header-def' using reader functions in 'readers'. Returns a map of
@@ -42,8 +49,8 @@
       - field: the name of a previously read field that contains
         number of bytes from start of the field (offset)
       - ':*': the rest of the buffer
-      - function: called with [buf msg-map offset readers header-def]
-        and returns the length of the field
+      - function: called with [buf msg-map offset] and returns the
+        length of the field
     - 'default': ignored for reading
     - 'args': seq of additional argument to append to reader call.
   "
@@ -54,11 +61,7 @@
     (if (or (empty? fields) (>= offset (or end (.-length buf))))
       msg-map
       (let [[[fname ftype flen fdefault args] & fields] fields
-            fend (cond (number? flen)  (+ offset flen)
-                       (= :*     flen) (.-length buf)
-                       (fn? flen)      (+ offset (flen buf msg-map offset
-                                                       readers header-def))
-                       :else           (+ offset (get msg-map flen)))
+            fend (get-end buf msg-map offset flen)
             reader (readers ftype)
             _ (assert reader (str "No reader for " ftype))
             value (apply reader buf offset fend readers args)
@@ -100,14 +103,13 @@
         (let [[[fname ftype flen fdefault args] & fields] fields
               writer (writers ftype)
               _ (assert writer (str "No writer for " ftype))
-              fend (let [value (if (contains? msg-map fname)
-                                 (get msg-map fname)
-                                 (if (fn? fdefault)
-                                   (fdefault buf msg-map offset writers)
-                                   fdefault))
-                         res (apply writer buf value offset writers args)]
-                     (if args
-                       res ;; compound, writer returns ending offset
-                       (+ flen offset)))]
+              value (if (contains? msg-map fname)
+                      (get msg-map fname)
+                      (if (fn? fdefault)
+                        (fdefault buf msg-map offset writers)
+                        fdefault))
+              ;; For fixed sized fields, ignore bytes written
+              res (apply writer buf value offset writers args)
+              fend (get-end buf msg-map offset flen res)]
           (recur fields fend))))))
 

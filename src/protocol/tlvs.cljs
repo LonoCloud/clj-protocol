@@ -24,12 +24,11 @@
         ltype (get {1 :uint8 2 :uint16} llen)
         code ((readers ctype) buf start)
         ttype (get-in tlv-lookup [:types code])
+        _ (assert ttype (str "No TLV lookup definition for code " code))
         targs (get-in tlv-lookup [:args code])
         targs (if (or (not targs) (= :self (first targs)))
                 (cons tlv-lookup (drop 1 targs))
                 targs)]
-    (when (not ttype)
-      (println (str "WARNING: No TLV reader for " code " treating as :raw")))
     (if (= :stop ttype)
       [code ttype 0 0]
       (let [len ((readers ltype) buf (+ clen start))
@@ -69,10 +68,10 @@
   then the current value of tlv-lookup will be substituted. This
   TLV fields to contain TLV fields that use the same definition/lookup."
   [buf [tname tvalue] start writers tlv-lookup clen llen]
-  (let [code (get-in tlv-lookup [:names tname])
-        _ (assert code (str "No TLV lookup definition for " tname))
-        ctype (get {1 :uint8 2 :uint16} clen)
+  (let [ctype (get {1 :uint8 2 :uint16} clen)
         ltype (get {1 :uint8 2 :uint16} llen)
+        code (get-in tlv-lookup [:names tname])
+        _ (assert code (str "No TLV lookup definition for " tname))
         vtype (get-in tlv-lookup [:types tname])
         vargs (get-in tlv-lookup [:args tname])
         vargs (if (or (not vargs) (= :self (first vargs)))
@@ -139,8 +138,6 @@
   (get-in-tlv* (:tlvs msg-map) path))
 
 ;;;
-
-(set! *warn-on-infer* false)
 
 (def readers
   {:tlv-seq read-tlv-seq

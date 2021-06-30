@@ -1,5 +1,6 @@
 (ns dhcp.core
   (:require [protocol.fields :as fields]
+            [protocol.addrs :as addrs]
             [protocol.tlvs :as tlvs]
             [protocol.header :as header]))
 
@@ -36,13 +37,13 @@
     [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
      [1   :opt/netmask           :ipv4         nil]
      [3   :opt/router            :ipv4         nil]
-     [4   :opt/time-servers      :ipv4set      nil]
-     [6   :opt/dns-servers       :ipv4set      nil]
+     [4   :opt/time-servers      :repeat       {:type :ipv4 :size 4}]
+     [6   :opt/dns-servers       :repeat       {:type :ipv4 :size 4}]
      [12  :opt/hostname          :str          nil]
      [15  :opt/domainname        :str          nil]
      [28  :opt/mtu               :uint16       nil]
      [28  :opt/broadcast         :ipv4         nil]
-     [41  :opt/nis-servers       :ipv4set      nil]
+     [41  :opt/nis-servers       :repeat       {:type :ipv4 :size 4}]
      [43  :opt/vend-spec-info    :raw          nil]
      [50  :opt/addr-req          :ipv4         nil]
      [51  :opt/lease-time        :uint32       nil]
@@ -81,14 +82,14 @@
    [:xid           :uint32       4     0                      nil]
    [:secs          :uint16       2     0                      nil]
    [:flags         :bitfield     2     nil                    {:spec DHCP-FLAGS}]
-   [:ciaddr        :ipv4         4     [0 0 0 0]              nil]
-   [:yiaddr        :ipv4         4     [0 0 0 0]              nil]
-   [:siaddr        :ipv4         4     [0 0 0 0]              nil] ;; next server
-   [:giaddr        :ipv4         4     [0 0 0 0]              nil]
-   [:chaddr        :mac          6     [0 0 0 0 0 0]          nil]
+   [:ciaddr        :ipv4         4     "0.0.0.0"              nil]
+   [:yiaddr        :ipv4         4     "0.0.0.0"              nil]
+   [:siaddr        :ipv4         4     "0.0.0.0"              nil] ;; next server
+   [:giaddr        :ipv4         4     "0.0.0.0"              nil]
+   [:chaddr        :mac          6     "00:00:00:00:00:00"    nil]
    [:chaddr-extra  :raw          10    [0 0 0 0 0 0 0 0 0 0]  nil]
    [:sname         :str          64    ""                     nil]
-   [:opt/bootfile  :str          128   ""                     nil] ;; :file
+   [:bootfile      :str          128   ""                     nil] ;; :file
    [:cookie        :raw          4     [99 130 83 99]         nil]
    [:options       :tlv-map      :*    nil                    {:tlv-tsize 1
                                                                :tlv-lsize 1
@@ -128,50 +129,46 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General DHCP message reading/writing
-
 (set! *warn-on-infer* false)
 
-(defn read-dhcp* [buf start end readers & args]
+(def readers
+  (merge
+    fields/readers
+    addrs/readers
+    tlvs/readers
+    {:msg-type #(get MSG-TYPE-LOOKUP (.readUInt8 %1 %2))}))
+
+(def writers
+  (merge
+    fields/writers
+    addrs/writers
+    tlvs/writers
+    {:msg-type #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)}))
+
+(set! *warn-on-infer* true)
+
+;;;
+
+
+(defn read-dhcp [buf]
   ;; Merge options up into the top level map
-  (let [msg-map (header/read-header buf start end {:readers readers :spec DHCP-HEADER})
+  (let [msg-map (header/read-header buf 0 (.-length buf)
+                                    {:readers readers :spec DHCP-HEADER})
         options (:options msg-map)]
     (dissoc (merge msg-map options)
             :options
             :opt/end)))
 
-(defn write-dhcp* [buf msg-map start writers & args]
+(defn write-dhcp [msg-map]
   ;; Move options down into :options keys
   (let [options (into {:opt/end 0}
                       (for [fname (map second OPTS-LIST)
                             :when (contains? msg-map fname)]
                         [fname (get msg-map fname)]))
         msg-map (merge msg-map HEADERS-FIXED {:options options})
-        buf (if buf buf (.alloc js/Buffer MAX-BUF-SIZE))]
-    (header/write-header buf msg-map start {:writers writers :spec DHCP-HEADER})))
-
-(def readers
-  (merge
-    fields/readers
-    tlvs/readers
-    {:ipv4set  #(set (partition 4 ((fields/readers :raw) %1 %2 %3)))
-     :msg-type #(get MSG-TYPE-LOOKUP (.readUInt8 %1 %2))
-     :dhcp read-dhcp*}))
-
-(def writers
-  (merge
-    fields/writers
-    tlvs/writers
-    {:ipv4set  #((fields/writers :raw) %1 (apply concat %2) %3)
-     :msg-type #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)
-     :dhcp write-dhcp*}))
-
-;;;
-
-(set! *warn-on-infer* true)
-
-(defn read-dhcp [buf]      ((readers :dhcp) buf 0 (.-length buf) readers))
-
-(defn write-dhcp [msg-map] ((writers :dhcp) nil msg-map 0 writers))
+        buf (.alloc js/Buffer MAX-BUF-SIZE)]
+    (header/write-header buf msg-map 0
+                         {:writers writers :spec DHCP-HEADER})))
 
 
 (defn default-response [msg-map srv-if]
@@ -189,5 +186,5 @@
        :opt/router         (:address srv-if)
        :opt/dhcp-server-id (:address srv-if)
        :opt/broadcast      (:broadcast srv-if)
-       :opt/dns-servers  #{(:address srv-if)}})))
+       :opt/dns-servers    [(:address srv-if)]})))
 

@@ -1,6 +1,10 @@
 (ns protocol.addrs-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [protocol.fields :as fields]
             [protocol.addrs :as addrs]))
+
+(def freaders (merge fields/readers addrs/readers))
+(def fwriters (merge fields/writers addrs/writers))
 
 (deftest test-net-addr-functions
   (println "  test-net-addr-functions")
@@ -37,3 +41,25 @@
          (addrs/ip-seq "10.0.1.7" "10.0.1.10")))
   )
 
+
+(deftest test-readers
+  (println "  test-readers")
+  (let [buf (.from js/Buffer (clj->js [65 66 67 68 69 70 71 72 73 74]))]
+    (doseq [[t v] {:ipv4      "67.68.69.70"
+                   :mac       "43:44:45:46:47:48"}]
+      (println "    reader" t)
+      (let [res ((freaders t) buf 2 10 {:readers freaders})]
+        (is res)
+        (is (= v res))))))
+
+(deftest test-writers
+  (println "  test-writers")
+  (doseq [[t [v1 v2 v3]]
+          {:ipv4      ["67.68.69.70"       4 [0 0 67 68 69 70  0  0  0  0]]
+           :mac       ["43:44:45:46:47:48" 6 [0 0 67 68 69 70 71 72  0  0]]}]
+    (println "    writer" t v1 v2 v3)
+    (let [buf (.alloc js/Buffer 10)
+          sz ((fwriters t) buf v1 2 {:writers fwriters})
+          octs (vec (.slice buf 0))]
+      (is (> sz 0))
+      (is (= v3 octs)))))

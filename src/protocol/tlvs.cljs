@@ -15,8 +15,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV readers
 
-(defn read-tlv
-  "Takes [buf start end ctx]."
+(defn read-tlv*
   [buf start end {:keys [readers lookup tlv-tsize tlv-lsize] :as ctx}]
   (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
@@ -25,12 +24,17 @@
         _ (assert ttype (str "No TLV lookup definition for code " code))
         tctx (get-in lookup [:ctxs code])]
     (if (= :stop ttype)
-      [code ttype 0 0]
+      [0 code ttype 0]
       (let [len ((readers ltype) buf (+ tlv-tsize start) nil ctx)
             vstart (+ tlv-tsize tlv-lsize start)
             vend   (+ tlv-tsize tlv-lsize start len)
             value ((readers ttype) buf vstart  vend (merge ctx tctx))]
-        [code ttype len value]))))
+        [len code ttype value]))))
+
+(defn read-tlv
+  "Takes [buf start end ctx]."
+  [buf start end ctx]
+  (first (read-tlv* buf start end ctx)))
 
 (defn read-tlv-seq
   "Takes [buf start end ctx]."
@@ -40,7 +44,7 @@
            tstart start]
       (if (>= tstart end)
         res
-        (let [[tcode ttype tlen value] (read-tlv buf tstart end ctx)
+        (let [[tlen tcode ttype value] (read-tlv* buf tstart end ctx)
               tend (+ tlv-tsize tlv-lsize tlen tstart)
               tname (get codes tcode tcode)
               res (conj res [tname value])]

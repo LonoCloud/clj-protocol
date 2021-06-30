@@ -49,7 +49,7 @@
 ;;      :mac-to-ip {<MAC> <IP>}}
 (defn pool-handler [cfg msg-map]
   (let [{:keys [pool save-pool if-info]} cfg
-        chaddr (addrs/octet->mac (:chaddr msg-map))
+        chaddr (:chaddr msg-map)
         {:keys [ip-to-mac mac-to-ip ranges]} @pool
         cur-ip (get mac-to-ip chaddr)
         ip (or cur-ip (first-free ip-to-mac ranges))]
@@ -58,16 +58,16 @@
     (swap! pool #(-> %1 (assoc-in [:mac-to-ip %2] %3)
                      (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
     (save-pool cfg @pool)
-    (assoc (dhcp/default-response msg-map (:octets if-info))
-      :yiaddr (addrs/ip->octet ip))))
+    (assoc (dhcp/default-response msg-map if-info)
+      :yiaddr ip)))
 
 (defn log-message [cfg msg-map addr]
   (let [msg-type (:opt/msg-type msg-map)
-        mac (addrs/octet->mac (:chaddr msg-map))]
+        mac (:chaddr msg-map)]
     (if (#{:DISCOVER :REQUEST} msg-type)
       (println "Received" msg-type "for" mac "from" addr)
       (println "Sent" msg-type "for"  mac "to" addr
-               "with yiaddr" (addrs/octet->ip (:yiaddr msg-map))))))
+               "with yiaddr" (:yiaddr msg-map)))))
 
 (defn log-lease [cfg msg-map cur-ip ip chaddr]
   (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr))

@@ -1,6 +1,5 @@
 (ns dhcp.node-client
-  (:require [protocol.addrs :as addrs]
-            [protocol.socket :as socket]
+  (:require [protocol.socket :as socket]
             [dhcp.core :as dhcp]
             [dhcp.util :as util]))
 
@@ -17,7 +16,7 @@
     (if (and msg-map (not= hw-addr chaddr))
       (when verbose
         (println "Ignoring" msg-type "for"
-                 (if chaddr (addrs/octet->mac chaddr) "") "(not us)"))
+                 (if chaddr chaddr "") "(not us)"))
       (let [;; _ (prn :msg-map msg-map)
             resp-defaults {:chaddr hw-addr}
             resp-msg-map (condp = msg-type
@@ -32,12 +31,12 @@
         (swap! state assoc :last-tx-ts (.getTime (js/Date.)))
         (when msg-map
           (println "Received" msg-type
-                   "message from" (addrs/octet->ip (:siaddr msg-map))))
+                   "message from" (:siaddr msg-map)))
         (if (= :ACK msg-type)
           (do
             (util/set-ip-address if-name
-                                 (addrs/octet->ip (:yiaddr msg-map))
-                                 (addrs/octet->ip (:opt/netmask msg-map)))
+                                 (:yiaddr msg-map)
+                                 (:opt/netmask msg-map))
             (swap! state assoc :assigned? true ))
           (if resp-msg-map
             (let [buf (dhcp/write-dhcp resp-msg-map)]
@@ -46,11 +45,11 @@
                         (println "Send failed:" %1)
                         (println "Sent" (:opt/msg-type resp-msg-map)
                                  "to" server-ip))))
-            (println "Got address:" (addrs/octet->ip (:yiaddr msg-map)))))))))
+            (println "Got address:" (:yiaddr msg-map))))))))
 
 (defn start-pcap-listener [{:keys [hw-addr if-name] :as cfg}]
   (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
-                         " and not ether src " (addrs/octet->mac hw-addr))
+                         " and not ether src " hw-addr)
         psession (.createSession pcap if-name #js {:filter pcap-filter})]
     (println (str "Listening via pcap (filter: '" pcap-filter "')"))
     (doto psession
@@ -84,9 +83,8 @@
         hw-addr (util/get-mac-address if-name)
         sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
         cfg {:if-name if-name
-             :hw-addr (addrs/mac->octet hw-addr)
+             :hw-addr hw-addr
              :server-ip server-ip
-             :server-addr (addrs/ip->octet server-ip)
              :sock sock
              :state (atom {:assigned? false
                            :last-tx-ts 0})}]

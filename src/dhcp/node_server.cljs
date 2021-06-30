@@ -1,6 +1,5 @@
 (ns dhcp.node-server
   (:require [clojure.string :as string]
-            [protocol.fields :as fields]
             [protocol.socket :as socket]
             [dhcp.core :as dhcp]))
 

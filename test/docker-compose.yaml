@@ -35,6 +35,8 @@ services:
         - {left: {container: cli_3, intf: eth0}, right: {container: net_1, intf: c3}}
 
         - {left: {container: ucli_1, intf: eth0, ip: 10.0.0.10/24}, right: {container: net_1, intf: uc1}}
+
+        - {left: {container: icli_1, intf: eth0, ip: 10.0.0.100/24}, right: {container: net_1, intf: ic1}}
       mininet-cfg:
         switches:
           - name: s1
@@ -43,15 +45,22 @@ services:
           - {name: c1,  node: s1}
           - {name: c2,  node: s1}
           - {name: c3,  node: s1}
+
           - {name: uc1,  node: s1}
+
+          - {name: ic1,  node: s1}
 
   svr:
     <<: *service-base
-    command: /root/app/init.sh /root/app/build/server.js eth0
+    command: /root/app/init.sh /root/app/build/dhcp-server.js eth0
   cli:
     <<: *service-base
     scale: 3
-    command: /root/app/init.sh /root/app/build/client.js eth0
+    command: /root/app/init.sh /root/app/build/dhcp-client.js eth0
   ucli:
     <<: *service-base
-    command: /root/app/init.sh /root/app/build/client.js --unicast eth0
+    command: /root/app/init.sh /root/app/build/dhcp-client.js --unicast eth0
+
+  icli:
+    <<: *service-base
+    command: /root/app/init.sh /root/app/build/ping.js 10.0.0.1

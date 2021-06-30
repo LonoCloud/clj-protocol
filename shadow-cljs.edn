@@ -6,10 +6,10 @@
  []
 
  :builds
- {:client
+ {:dhcp-client
   {:target :node-script
    :main dhcp.node-client/main
-   :output-to "build/client.js"
+   :output-to "build/dhcp-client.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
 
@@ -17,10 +17,21 @@
    {:optimizations :simple
     :source-map-use-fs-paths true}}
 
-  :server
+  :dhcp-server
   {:target :node-script
    :main dhcp.json-pool-server/main
-   :output-to "build/server.js"
+   :output-to "build/dhcp-server.js"
+   ;; Don't try and connect back to shadow-cljs process
+   :devtools {:enabled false :console-support false}
+
+   :compiler-options
+   {:optimizations :simple
+    :source-map-use-fs-paths true}}
+
+  :ping-client
+  {:target :node-script
+   :main icmp.ping/main
+   :output-to "build/ping.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
 

@@ -51,3 +51,12 @@
   [start end]
   (map int->ip (range (ip->int start) (+ 1 (ip->int end)))))
 
+;;;
+
+(def readers
+  {:ipv4      #(octet->ip (.slice %1 %2 (+ 4 %2)))
+   :mac       #(octet->mac (.slice %1 %2 (+ 6 %2)))})
+
+(def writers
+  {:ipv4      #(fields/arr-fill %1 (ip->octet %2) %3 4)
+   :mac       #(fields/arr-fill %1 (mac->octet %2) %3 6)})

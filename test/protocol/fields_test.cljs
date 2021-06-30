@@ -25,11 +25,13 @@
                    :uint16    17220
                    :uint32    1128547654
                    :uint64    (js/BigInt "4847075267103443274")
-                   :ipv4      [67 68 69 70]
-                   :mac       [67 68 69 70 71 72]
+                   :repeat    [67 68 69 70]
                    :bitfield  {:a 269, :b false, :c true, :d 17734}}]
       (println "    reader" t)
-      (let [res ((freaders t) buf 2 6 {:readers freaders :spec bit-spec})]
+      (let [res ((freaders t) buf 2 6 {:readers freaders
+                                       :spec bit-spec
+                                       :type :uint8
+                                       :size 1})]
         (is res)
         (is (= v res))))))
 
@@ -43,13 +45,15 @@
              :uint32    [1128547654          4 [0 0 67 68 69 70  0  0  0  0]]
              :uint64    [(js/BigInt "4847075267103443274")
                                              8 [0 0 67 68 69 70 71 72 73 74]]
-             :ipv4      [[67 68 69 70]       4 [0 0 67 68 69 70  0  0  0  0]]
-             :mac       [[67 68 69 70 71 72] 6 [0 0 67 68 69 70 71 72  0  0]]
+             :repeat    [[67 68 69 70]       4 [0 0 67 68 69 70  0  0  0  0]]
              :bitfield  [{:a 269, :b false, :c true, :d 17734}
                                              4 [0 0 67 68 69 70  0  0  0  0]]}]
       (println "    writer" t v1 v2 v3)
       (let [buf (.alloc js/Buffer 10)
-            sz ((fwriters t) buf v1 2 {:writers fwriters :spec bit-spec})
+            sz ((fwriters t) buf v1 2 {:writers fwriters
+                                       :spec bit-spec
+                                       :type :uint8
+                                       :size 1})
             octs (vec (.slice buf 0))]
         (is (> sz 0))
         (is (= v3 octs))))))

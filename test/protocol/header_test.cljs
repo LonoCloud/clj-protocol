@@ -8,7 +8,7 @@
 (def TLV-LIST
   [;; code, name,             type
    [1       :tlv/msg-type     :msg-type ]
-   [2       :tlv/address      :ipv4     ]
+   [2       :tlv/address      :raw      ]
    [3       :tlv/hostname     :str      ]])
 (def TLV-LOOKUP (tlvs/tlv-list->lookup TLV-LIST))
 

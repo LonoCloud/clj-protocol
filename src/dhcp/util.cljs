@@ -8,14 +8,11 @@
 
 (defn get-if-ipv4 [if-name]
   (let [srv-ifs (-> os .networkInterfaces (js->clj :keywordize-keys true))
-    _ (prn srv-ifs)
+        _ (prn :srv-ifs srv-ifs)
         srv-if-ipv4 (-> srv-ifs (get (keyword if-name)) first)
         {:keys [address netmask]} srv-if-ipv4]
     (assoc srv-if-ipv4
-      :octets {:address (addrs/ip->octet address)
-               :netmask (addrs/ip->octet netmask)
-               :broadcast (addrs/ip->octet (addrs/broadcast address netmask))
-               :mac (addrs/mac->octet (:mac srv-if-ipv4))})))
+           :broadcast (addrs/broadcast address netmask))))
 
 (defn set-ip-address [if-name address netmask]
   (let [prefix (addrs/mask-ip->prefix netmask)

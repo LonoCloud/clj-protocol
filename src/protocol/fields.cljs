@@ -63,8 +63,9 @@
    :uint16    #(.readUInt16BE %1 %2)
    :uint32    #(.readUInt32BE %1 %2)
    :uint64    #(.readBigUInt64BE %1 %2)
-   :ipv4      #(vec (.slice %1 %2 (+ 4 %2)))
-   :mac       #(vec (.slice %1 %2 (+ 6 %2)))
+   :repeat    #(let [f ((:readers %4) (:type %4))]
+                 (map (fn [o] (f %1 o (+ o (:size %4)) %4))
+                      (range %2 %3 (:size %4))))
    :bitfield  #(bytes->bitfield (vec (.slice %1 %2 %3)) (:spec %4))})
 
 (defn arr-fill [dbuf arr off & [cnt]]
@@ -87,7 +88,9 @@
    :uint16    #(.writeUInt16BE %1 %2 %3)
    :uint32    #(.writeUInt32BE %1 %2 %3)
    :uint64    #(.writeBigUInt64BE %1 %2 %3)
-   :ipv4      #(arr-fill %1 %2 %3 4)
-   :mac       #(arr-fill %1 %2 %3 6)
+   :repeat    #(let [f ((:writers %4) (:type %4))]
+                 (last (map (fn [v o] (f %1 v o %4))
+                            %2
+                            (iterate (fn [x] (+ x (:size %4))) %3))))
    :bitfield  #(arr-fill %1 (bitfield->bytes %2 (:spec %4)) %3)})
 

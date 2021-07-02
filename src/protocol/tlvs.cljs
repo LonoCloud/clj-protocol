@@ -1,4 +1,5 @@
-(ns protocol.tlvs)
+(ns protocol.tlvs
+  (:require [protocol.fields :as fields]))
 
 ;; https://en.wikipedia.org/wiki/Type%E2%80%93length%E2%80%93value
 
@@ -15,54 +16,42 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV readers
 
-(defn read-tlv*
+(defn read-tlv
+  "Takes [buf start end ctx]. Returns [name value] with metadata
+  '{:protocol/end end}' (where 'end' is offset after read)."
   [buf start end {:keys [readers lookup tlv-tsize tlv-lsize] :as ctx}]
   (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
         code ((readers ctype) buf start nil ctx)
         ttype (get-in lookup [:types code])
         _ (assert ttype (str "No TLV lookup definition for code " code))
+        tname (get-in lookup [:codes code])
         tctx (get-in lookup [:ctxs code])]
-    (if (= :stop ttype)
-      [0 code ttype 0]
+    (if (= :tlv-stop ttype)
+      (vary-meta [tname nil] merge {:protocol/end (+ start tlv-tsize)
+                                    :protocol/stop true})
       (let [len ((readers ltype) buf (+ tlv-tsize start) nil ctx)
             vstart (+ tlv-tsize tlv-lsize start)
             vend   (+ tlv-tsize tlv-lsize start len)
             value ((readers ttype) buf vstart  vend (merge ctx tctx))]
-        [len code ttype value]))))
-
-(defn read-tlv
-  "Takes [buf start end ctx]."
-  [buf start end ctx]
-  (first (read-tlv* buf start end ctx)))
+        (vary-meta [tname value] merge {:protocol/end vend})))))
 
 (defn read-tlv-seq
-  "Takes [buf start end ctx]."
-  [buf start end {:keys [lookup tlv-tsize tlv-lsize] :as ctx}]
-  (let [{:keys [types codes]} lookup]
-    (loop [res []
-           tstart start]
-      (if (>= tstart end)
-        res
-        (let [[tlen tcode ttype value] (read-tlv* buf tstart end ctx)
-              tend (+ tlv-tsize tlv-lsize tlen tstart)
-              tname (get codes tcode tcode)
-              res (conj res [tname value])]
-          (if (= :stop ttype)
-            res
-            (recur res tend)))))))
+  [buf start end ctx]
+  (fields/read-loop buf start end (assoc ctx :loop-type :tlv)))
 
 ;;;
 
 (defn read-tlv-map
   [buf start end ctx]
-  (into {} (read-tlv-seq buf start end ctx)))
+  (let [tlvs (read-tlv-seq buf start end ctx)]
+    (with-meta (into {} tlvs) (meta tlvs))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TLV writers
 
 (defn write-tlv
-  "Take [buf [tlv-name tlv-value] start ctx]."
+  "Takes [buf [name value] start ctx]. Returns offset after write."
   [buf [tlv-name tlv-value] start {:keys [writers lookup
                                           tlv-tsize tlv-lsize] :as ctx}]
   (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
@@ -73,7 +62,7 @@
         vctx (get-in lookup [:ctxs tlv-name])
         vstart (+ start tlv-tsize tlv-lsize)
         end ((writers ctype) buf code start ctx)]
-    (if (= :stop vtype)
+    (if (= :tlv-stop vtype)
       end
       (let [vwriter (writers vtype)
             _ (assert vwriter (str "No writer for " vtype))
@@ -82,21 +71,15 @@
         end))))
 
 (defn write-tlv-seq
-  [buf tlvs tlv-start ctx]
-  (loop [tend tlv-start
-         tlvs tlvs]
-    (if (not (seq tlvs))
-      tend
-      (let [tlv (first tlvs)
-            tend (write-tlv buf tlv tend ctx)]
-        (recur tend (next tlvs))))))
+  [buf value start ctx]
+  (fields/write-loop buf value start (assoc ctx :loop-type :tlv)))
 
 ;;;
 
 (defn write-tlv-map
-  [buf tlvs tlv-start {:keys [lookup] :as ctx}]
-  (let [tlv-map (into {} tlvs)
-        tlvs (for [[c n t l] (:list lookup)
+  "Takes [buf tlv-map tlv-start ctx]. Returns offset after write."
+  [buf tlv-map tlv-start {:keys [lookup] :as ctx}]
+  (let [tlvs (for [[c n t l] (:list lookup)
                    :when (contains? tlv-map n)]
                [n (get tlv-map n)])]
     (write-tlv-seq buf tlvs tlv-start ctx)))

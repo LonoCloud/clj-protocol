@@ -3,8 +3,8 @@
             [protocol.fields :as fields]
             [protocol.addrs :as addrs]))
 
-(def freaders (merge fields/readers addrs/readers))
-(def fwriters (merge fields/writers addrs/writers))
+(def freaders (merge fields/readers-BE addrs/readers))
+(def fwriters (merge fields/writers-BE addrs/writers))
 
 (deftest test-net-addr-functions
   (println "  test-net-addr-functions")

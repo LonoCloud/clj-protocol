@@ -37,13 +37,13 @@
     [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
      [1   :opt/netmask           :ipv4         nil]
      [3   :opt/router            :ipv4         nil]
-     [4   :opt/time-servers      :repeat       {:type :ipv4 :size 4}]
-     [6   :opt/dns-servers       :repeat       {:type :ipv4 :size 4}]
+     [4   :opt/time-servers      :repeat       {:repeat-type :ipv4 :repeat-size 4}]
+     [6   :opt/dns-servers       :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [12  :opt/hostname          :str          nil]
      [15  :opt/domainname        :str          nil]
      [28  :opt/mtu               :uint16       nil]
      [28  :opt/broadcast         :ipv4         nil]
-     [41  :opt/nis-servers       :repeat       {:type :ipv4 :size 4}]
+     [41  :opt/nis-servers       :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [43  :opt/vend-spec-info    :raw          nil]
      [50  :opt/addr-req          :ipv4         nil]
      [51  :opt/lease-time        :uint32       nil]
@@ -64,7 +64,7 @@
              [n (keyword (str "opt-site-" n)) :raw])
            (range 224 (inc 254)))
 
-      [[255 :opt/end             :stop        nil ]])))
+      [[255 :opt/end             :tlv-stop    nil ]])))
 (def OPTS-LOOKUP (tlvs/tlv-list->lookup OPTS-LIST))
 
 
@@ -133,14 +133,14 @@
 
 (def readers
   (merge
-    fields/readers
+    fields/readers-BE
     addrs/readers
     tlvs/readers
     {:msg-type #(get MSG-TYPE-LOOKUP (.readUInt8 %1 %2))}))
 
 (def writers
   (merge
-    fields/writers
+    fields/writers-BE
     addrs/writers
     tlvs/writers
     {:msg-type #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)}))
@@ -152,8 +152,8 @@
 
 (defn read-dhcp [buf]
   ;; Merge options up into the top level map
-  (let [msg-map (header/read-header buf 0 (.-length buf)
-                                    {:readers readers :spec DHCP-HEADER})
+  (let [msg-map (header/read-header-full buf 0 (.-length buf)
+                                         {:readers readers :spec DHCP-HEADER})
         options (:options msg-map)]
     (dissoc (merge msg-map options)
             :options
@@ -167,8 +167,8 @@
                         [fname (get msg-map fname)]))
         msg-map (merge msg-map HEADERS-FIXED {:options options})
         buf (.alloc js/Buffer MAX-BUF-SIZE)]
-    (header/write-header buf msg-map 0
-                         {:writers writers :spec DHCP-HEADER})))
+    (header/write-header-full buf msg-map 0
+                              {:writers writers :spec DHCP-HEADER})))
 
 
 (defn default-response [msg-map srv-if]

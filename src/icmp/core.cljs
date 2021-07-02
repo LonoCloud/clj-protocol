@@ -28,8 +28,8 @@
          (into {} (map (fn [[c n]] [n c]) MSG-TYPE-LIST))))
 
 (def ICMP-TYPE-HEADERS
-  {:echo-request
    ;;  name,          type,           length,  default
+  {:echo-request
    [[:id            :uint16         2        0]
     [:seq-num       :uint16         2        0]
     [:payload       :raw            :*       nil]]
@@ -64,22 +64,13 @@
   (let [msg-type (get-in ctx [:msg-map :type])
         type-header (get-in ctx [:type-headers msg-type])
         ctx (assoc ctx :spec type-header)]
-    ;; Use composable version that returns length
-    (header/write-header* buf msg-map start ctx)))
-
-(defn read-icmp* [buf start end ctx]
-  (header/read-header buf start end ctx))
-
-(defn write-icmp* [buf msg-map start ctx]
-  (let [buf (if buf buf (.alloc js/Buffer MAX-BUF-SIZE))]
     (header/write-header buf msg-map start ctx)))
-
 
 (set! *warn-on-infer* false)
 
 (def readers
   (merge
-    fields/readers
+    fields/readers-BE
     addrs/readers
     {:msg-type  #(let [tnum (.readUInt8 %1 %2)
                        typ (get MSG-TYPE-LOOKUP tnum)]
@@ -89,7 +80,7 @@
 
 (def writers
   (merge
-    fields/writers
+    fields/writers-BE
     addrs/writers
     {:msg-type   #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)
      :icmp-data  write-icmp-data}))
@@ -97,8 +88,11 @@
 (set! *warn-on-infer* true)
 
 (defn read-icmp [buf]
-  (read-icmp* buf 0 (.-length buf) {:readers readers :spec ICMP-HEADER}))
+  (header/read-header-full buf 0 (.-length buf)
+                           {:readers readers :spec ICMP-HEADER}))
 
 (defn write-icmp [msg-map]
-  (write-icmp* nil msg-map 0 {:writers writers :spec ICMP-HEADER}))
+  (let [buf (.alloc js/Buffer MAX-BUF-SIZE)]
+    (header/write-header-full buf msg-map 0
+                              {:writers writers :spec ICMP-HEADER})))
 

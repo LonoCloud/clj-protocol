@@ -31,7 +31,8 @@
 (defn read-header
   "Takes [buf start end ctx] and parses 'buf' based on '(:spec ctx)'
   using reader functions in '(:readers ctx)'. Returns a map of parsed
-  fields.
+  fields with metdata '{:protocol/end end}' (where end is offset after
+  read).
 
   Parameters:
   - 'buf': is the js/Buffer to read from
@@ -56,44 +57,25 @@
   (loop [fields spec
          offset start
          msg-map {}]
+    ;;(prn :read-header1 :offset offset :end end :-length (.-length buf) :field-cnt (count fields))
     (if (or (empty? fields) (>= offset (or end (.-length buf))))
-      msg-map
+      (with-meta msg-map {:protocol/end offset})
       (let [[[fname ftype flen fdefault fctx] & fields] fields
-            fend (get-end buf msg-map offset flen)
+            fend (get-end buf msg-map offset flen end)
             reader (readers ftype)
             _ (assert reader (str "No reader for " ftype))
             ctx (merge ctx fctx {:msg-map msg-map})
             value (reader buf offset fend ctx)
+            ;;_ (prn :read-header2 :fname fname :flen flen :fend fend :mend (-> value meta :protocol/end))
+            fend (get-end buf msg-map offset flen (-> value meta :protocol/end))
+            ;;_ (prn :read-header3 :fend fend)
             msg-map (assoc msg-map fname value)]
         (recur fields fend msg-map)))))
 
-(defn write-header*
-  "Like write-header but requires buf and returns ending offset.
-  Designed to be used as composable writer function."
-  [buf msg-map start {:keys [writers spec] :as ctx}]
-  (loop [fields spec
-         offset start]
-    (if (or (empty? fields) (>= offset (.-length buf)))
-      offset
-      (let [[[fname ftype flen fdefault fctx] & fields] fields
-            writer (writers ftype)
-            _ (assert writer (str "No writer for " ftype))
-            value (if (contains? msg-map fname)
-                    (get msg-map fname)
-                    fdefault)
-            ctx (merge ctx fctx {:msg-map msg-map})
-            ;; For fixed sized fields, ignore bytes written
-            res (writer buf value offset ctx)
-            fend (get-end buf msg-map offset flen res)]
-        (recur fields fend)))))
-
 (defn write-header
   "Takes [buf msg-map start ctx] and encodes msg-map data
-  into 'buf' (allocated if not provided) based on '(:spec ctx)'
-  using writer functions in '(:writers ctx)'. Returns the encoded
-  js/Buffer sliced to size of the actual written data.
-
-  Use write-header* for composable writer function.
+  into 'buf' based on '(:spec ctx)' using writer functions in
+  '(:writers ctx)'. Returns offset after written data.
 
   Parameters:
   - 'buf': is the js/Buffer to write into (if nil then allocates
@@ -112,9 +94,39 @@
       - 'extra-ctx': extra context merged into ctx before writing
     - 'msg-map': parent msg-map for compound writers
   "
-  [buf & args]
+  [buf msg-map start {:keys [writers spec] :as ctx}]
+  (loop [fields spec
+         offset start]
+    (if (or (empty? fields) (>= offset (.-length buf)))
+      offset
+      (let [[[fname ftype flen fdefault fctx] & fields] fields
+            writer (writers ftype)
+            _ (assert writer (str "No writer for " ftype))
+            value (if (contains? msg-map fname)
+                    (get msg-map fname)
+                    fdefault)
+            ctx (merge ctx fctx {:msg-map msg-map})
+            ;; For fixed sized fields, ignore bytes written
+            res (writer buf value offset ctx)
+            fend (get-end buf msg-map offset flen res)]
+        (recur fields fend)))))
+
+(def ^{:doc "Alias for read-header."} read-header-full read-header)
+
+(defn write-header-full
+  "Like write-header but allocates a default sized buffer if not
+  provided and returns the encoded js/Buffer sliced to size of the
+  actual written data.
+  "
+  [buf msg-map start ctx]
   (let [buf (cond (not buf)     (.alloc js/Buffer DEFAULT-BUF-SIZE)
                   (number? buf) (.alloc js/Buffer buf)
                   :else         buf)
-        end (apply write-header* buf args)]
+        end (write-header buf msg-map start ctx)]
     (.slice buf 0 end)))
+
+(def readers
+  {:header  read-header})
+
+(def writers
+  {:header  write-header})

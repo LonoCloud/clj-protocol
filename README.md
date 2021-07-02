@@ -1,8 +1,12 @@
 # clj-protocol: Declarative Protocols and Binary Formats
 
-## Header Defintions
+## Tutorial
 
-## Simple Readers / Writers
+## API Reference
+
+### Header Defintions
+
+### Simple Readers / Writers
 
 * Numeric types
 * Address types
@@ -10,7 +14,7 @@
 * Raw
 * Buffer
 
-## Compound Readers / Writers
+### Compound Readers / Writers
 
 * bitfield
 * lookup
@@ -22,4 +26,15 @@
 ## TODO
 - add signed int value types ?
 - :lookup -> :tlv-lookup ?
+
+## Running / testing on NixOS
+
+Run the following on NixOS to get the required node modules (pcap and
+raw-socket) installed to be able to run the ping and and dhcp
+commands:
+
+```
+rm -r node_modules
+nix-shell -p libpcap --run 'npm install'
+```
 

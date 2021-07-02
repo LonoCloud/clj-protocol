@@ -22,6 +22,9 @@
         (recur spec fend res)
         res))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Compound reader and writer functions
+
 (defn get-end
   [buf msg-map offset flen & [res]]
   (cond (number? flen)  (+ offset flen)
@@ -110,6 +113,8 @@
             res (writer buf value offset ctx)
             fend (get-end buf msg-map offset flen res)]
         (recur fields fend)))))
+
+;;;
 
 (def ^{:doc "Alias for read-header."} read-header-full read-header)
 

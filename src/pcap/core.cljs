@@ -35,27 +35,22 @@
    [:dst-addr   :ipv4         4         0         nil]
    [:payload    :raw          :*        0         nil]])
 
+(def ETHERTYPE-MAP
+  {0x0806 {:choice-type :header :spec ARP-V4-HEADER}
+   0x0800 {:choice-type :header :spec IP-V4-HEADER}})
+
 (def ETHERNET-HEADER
   ;;name,       type,         length,   default,  extra-context
   [[:dst-mac    :mac          6         ""        nil]
    [:src-mac    :mac          6         ""        nil]
    [:ethertype  :uint16       2         0         nil]
-   [:payload    :eth-payload  :*        nil       nil]])
-
-(defn eth-payload-reader
-  [buf start end {:keys [msg-map] :as ctx}]
-  (let [ethertype (:ethertype msg-map)
-        spec (condp = ethertype
-               0x800 IP-V4-HEADER
-               0x806 ARP-V4-HEADER
-               :else (assert false (str "Unknown ethertype" ethertype)))]
-    ;;(prn :eth-payload-reader :start start :end end :checksum (:checksum msg-map))
-    (header/read-header buf start end (assoc ctx :spec spec))))
+   [:payload    :choice       :*        nil       {:choice-on :ethertype
+                                                   :choices ETHERTYPE-MAP}]])
 
 (def packet-readers
   (merge fields/readers-BE
          addrs/readers
-         {:eth-payload eth-payload-reader}))
+         header/readers))
 
 (def RECORD-HEADER
   ;;name,       type,       length,   default,  extra-context

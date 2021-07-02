@@ -111,6 +111,34 @@
               fend (writer buf value fend ctx)]
           (recur fend (next values)))))))
 
+;;;
+
+(defn read-choice
+  [buf start end {:keys [msg-map readers choice-on choices] :as ctx}]
+  (let [switch-val (get msg-map choice-on)
+        _ (assert switch-val
+                  (str "Switch on key " choice-on " not in msg-map"))
+        choice (get choices switch-val)
+        _ (assert choice
+                  (str "Switch value " switch-val " not in choices map"))
+        {:keys [choice-type spec]} choice
+        reader (readers choice-type)]
+    (assert reader (str "No reader for " choice-type))
+    (reader buf start end (merge ctx (dissoc choice choice-type)))))
+
+(defn write-choice
+  [buf value start {:keys [msg-map writers choice-on choices] :as ctx}]
+  (let [switch-val (get msg-map choice-on)
+        _ (assert switch-val
+                  (str "Switch on key " choice-on " not in msg-map"))
+        choice (get choices switch-val)
+        _ (assert choice
+                  (str "Switch value " switch-val " not in choices map"))
+        {:keys [choice-type spec]} choice
+        writer (writers choice-type)]
+    (assert writer (str "No writer for " choice-type))
+    (writer buf value start (merge ctx (dissoc choice choice-type)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Readers and writers
 
@@ -126,7 +154,8 @@
    :str       #(.replace (.toString %1 "utf8" %2 %3) remove-null-re "")
    :uint8     #(.readUInt8 %1 %2)
    :repeat    read-repeat
-   :loop      read-loop})
+   :loop      read-loop
+   :choice    read-choice})
 
 (def readers-BE
   (merge
@@ -152,7 +181,8 @@
    :str       #(do (.write %1 %2 %3 "utf8") (+ (.-length %2) %3))
    :uint8     #(.writeUInt8 %1 %2 %3)
    :repeat    write-repeat
-   :loop      write-loop})
+   :loop      write-loop
+   :choice    write-choice})
 
 (def writers-BE
   (merge

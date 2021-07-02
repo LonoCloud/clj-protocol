@@ -28,15 +28,14 @@
   (println "  test-readers")
   (let [buf (.from js/Buffer (clj->js [65 66 67 68 69 70 71 72 73 74]))
         bit-spec [[:a :int 10] [:b :bool 1] [:c :bool 3] [:d :int 18]]]
-    (doseq [
-            [t v] {:str       "CDEF"
-                   :uint8     67
-                   :uint16    17220
-                   :uint32    1128547654
-                   :uint64    (js/BigInt "4847075267103443274")
-                   :repeat    [67 68 69 70]
-                   :loop      [[67] [68] [69] [70]]
-                   :bitfield  {:a 269, :b false, :c true, :d 17734}}]
+    (doseq [[t v] [[:str       "CDEF"]
+                   [:uint8     67]
+                   [:uint16    17220]
+                   [:uint32    1128547654]
+                   [:uint64    (js/BigInt "4847075267103443274")]
+                   [:repeat    [67 68 69 70]]
+                   [:loop      [[67] [68] [69] [70]]]
+                   [:bitfield  {:a 269, :b false, :c true, :d 17734}]]]
       (println "    reader" t)
       (let [res ((freaders t) buf 2 6 {:readers freaders
                                        :spec bit-spec
@@ -70,6 +69,33 @@
             octs (vec (.slice buf 0))]
         (is (> sz 0))
         (is (= v3 octs))))))
+
+(deftest test-choice
+  (println "  test-choice")
+  (let [base-ctx {:readers freaders
+                  :writers fwriters
+                  :choice-on :a
+                  :choices {1 {:choice-type :uint8}
+                            2 {:choice-type :uint16}}}]
+    (println "    reader")
+    (let [reader (freaders :choice)
+          buf (.from js/Buffer (clj->js [65 66 67 68 69 70]))
+          res1 (reader buf 2 6 (assoc base-ctx :msg-map {:a 1}))
+          res2 (reader buf 2 6 (assoc base-ctx :msg-map {:a 2}))]
+      (is (= 67 res1))
+      (is (= 17220 res2))
+      (is (thrown? js/Error (reader buf 2 6 (assoc base-ctx :msg-map {}))))
+      (is (thrown? js/Error (reader buf 2 6 (assoc base-ctx :msg-map {:a 3})))))
+
+    (println "    writer")
+    (let [writer (fwriters :choice)
+          buf1 (.alloc js/Buffer 6)
+          buf2 (.alloc js/Buffer 6)
+          sz1 (writer buf1 67    2 (assoc base-ctx :msg-map {:a 1}))
+          sz2 (writer buf2 17220 2 (assoc base-ctx :msg-map {:a 2}))]
+      (is (= [0 0 67  0 0 0] (vec (.slice buf1 0))))
+      (is (= [0 0 67 68 0 0] (vec (.slice buf2 0))))
+      )))
 
 (deftest test-string-readers-writers
   (println "  test-string-readers-writers")

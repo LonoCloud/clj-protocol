@@ -26,5 +26,4 @@
     (is (= 25 (count records)))
     (is (= 2 (count (get ptypes 2054))))
     (is (= 23 (count (get ptypes 2048))))
-    (is (= FIRST-IP ip))
-    ))
+    (is (= FIRST-IP ip))))

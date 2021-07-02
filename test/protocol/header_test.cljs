@@ -19,14 +19,14 @@
 
 (def HEADER-1
   ;; name,  type,         length,  default,  extra context
-  [[:op     :uint8        1        0         ]
-   [:xid    :uint32       4        0         ]
-   [:flags  :bitfield     2        nil       {:spec [[:bflag1  :bool   1]
-                                                     [:iflag2  :int   12]
-                                                     [:iflag3  :int    3]]}]
-   [:tlvs   :tlv-map      :*       nil       {:lookup TLV-LOOKUP
-                                              :tlv-tsize 1
-                                              :tlv-lsize 1}]])
+  [[:op     :uint8        1        {:default 0}]
+   [:xid    :uint32       4        {:default 0}]
+   [:flags  :bitfield     2        {:spec [[:bflag1  :bool   1]
+                                           [:iflag2  :int   12]
+                                           [:iflag3  :int    3]]}]
+   [:tlvs   :tlv-map      :*       {:lookup TLV-LOOKUP
+                                    :tlv-tsize 1
+                                    :tlv-lsize 1}]])
 
 (def TEST-MSG-1-STR
   "01
@@ -49,14 +49,14 @@
 
 (def HEADER-2
   ;; name,  type,         length,  default,  extra context
-  [[:op     :uint16       2        0         ]
-   [:host   :str          6        "abcdef"  ]
-   [:hops   :tlv          :*       nil       {:lookup TLV-LOOKUP
-                                              :tlv-tsize 2
-                                              :tlv-lsize 2}]
-   [:tlvs   :tlv-seq      :*       nil       {:lookup TLV-LOOKUP
-                                              :tlv-tsize 2
-                                              :tlv-lsize 2}]])
+  [[:op     :uint16       2        {:default 0}]
+   [:host   :str          6        {:default "abcdef"}]
+   [:hops   :tlv          :*       {:lookup TLV-LOOKUP
+                                    :tlv-tsize 2
+                                    :tlv-lsize 2}]
+   [:tlvs   :tlv-seq      :*       {:lookup TLV-LOOKUP
+                                    :tlv-tsize 2
+                                    :tlv-lsize 2}]])
 
 (def TEST-MSG-2-STR
   "00 03
@@ -78,15 +78,15 @@
 
 ;;  name,   type,         length,  default,  extra context
 (def HEADER-3b
-  [[:hops   :tlv          :*       nil       {:lookup TLV-LOOKUP
-                                              :tlv-tsize 2
-                                              :tlv-lsize 2}]])
+  [[:hops   :tlv          :*       {:lookup TLV-LOOKUP
+                                    :tlv-tsize 2
+                                    :tlv-lsize 2}]])
 (def HEADER-3c
-  [[:host   :str          6        "abcdef"  ]])
+  [[:host   :str          6        {:default "abcdef"}]])
 (def HEADER-3 
-  [[:op     :uint8        1        0         ]
-   [:data-b :header       :*       nil       {:spec HEADER-3b}]
-   [:data-c :header       :*       nil       {:spec HEADER-3c}]])
+  [[:op     :uint8        1        {:default 0}]
+   [:data-b :header       :*       {:spec HEADER-3b}]
+   [:data-c :header       :*       {:spec HEADER-3c}]])
 
 (def TEST-MSG-3-STR
   "01

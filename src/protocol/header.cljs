@@ -2,26 +2,6 @@
 
 (def DEFAULT-BUF-SIZE 1500)
 
-(defn header->lookup
-  "Take a 'spec' sequence and returns a map of key name to a map
-  of field properties from 'spec' for that field."
-  [spec]
-  (loop [spec spec
-         offset 0
-         res {}]
-    (let [[field-def & spec] spec
-          [fname ftype flength fdefault] field-def
-          fend (+ offset flength)
-          res (assoc res fname {:name fname
-                                :type ftype
-                                :length flength
-                                :default fdefault
-                                :start offset
-                                :end fend})]
-      (if (seq spec)
-        (recur spec fend res)
-        res))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Compound reader and writer functions
 
@@ -52,7 +32,6 @@
         - field: the name of a previously read field that contains
           number of bytes from start of the field (offset)
         - ':*': the rest of the buffer
-      - 'default': ignored for reading
       - 'extra-ctx': extra context merged into ctx before reading
     - 'msg-map': map of values previously read
   "
@@ -63,7 +42,7 @@
     ;;(prn :read-header1 :offset offset :end end :-length (.-length buf) :field-cnt (count fields))
     (if (or (empty? fields) (>= offset (or end (.-length buf))))
       (with-meta msg-map {:protocol/end offset})
-      (let [[[fname ftype flen fdefault fctx] & fields] fields
+      (let [[[fname ftype flen fctx] & fields] fields
             fend (get-end buf msg-map offset flen end)
             reader (readers ftype)
             _ (assert reader (str "No reader for " ftype))
@@ -92,9 +71,9 @@
       - 'name': field key to lookup in msg-map.
       - 'type': type to lookup in writers map
       - 'length': ignored for writing
-      - 'default': if lookup is not set and msg-map does not contain
-        'name' then 'default' is used instead
       - 'extra-ctx': extra context merged into ctx before writing
+        - 'default': if msg-map does not contain 'name' then this is
+           used instead
     - 'msg-map': parent msg-map for compound writers
   "
   [buf msg-map start {:keys [writers spec] :as ctx}]
@@ -102,12 +81,12 @@
          offset start]
     (if (or (empty? fields) (>= offset (.-length buf)))
       offset
-      (let [[[fname ftype flen fdefault fctx] & fields] fields
+      (let [[[fname ftype flen fctx] & fields] fields
             writer (writers ftype)
             _ (assert writer (str "No writer for " ftype))
             value (if (contains? msg-map fname)
                     (get msg-map fname)
-                    fdefault)
+                    (get fctx :default))
             ctx (merge ctx fctx {:msg-map msg-map})
             ;; For fixed sized fields, ignore bytes written
             res (writer buf value offset ctx)

@@ -28,32 +28,32 @@
          (into {} (map (fn [[c n]] [n c]) MSG-TYPE-LIST))))
 
 (def ICMP-TYPE-HEADERS
-   ;;  name,          type,           length,  default
+  ;; name,          type,         length,    extra-context
   {:echo-request
-   [[:id            :uint16         2        0]
-    [:seq-num       :uint16         2        0]
-    [:payload       :raw            :*       nil]]
+   [[:id            :uint16         2        {:default 0}]
+    [:seq-num       :uint16         2        {:default 0}]
+    [:payload       :raw            :*       {}]]
 
    :echo-reply
-   [[:id            :uint16         2        0]
-    [:seq-num       :uint16         2        0]
-    [:payload       :raw            :*       nil]]
+   [[:id            :uint16         2        {:default 0}]
+    [:seq-num       :uint16         2        {:default 0}]
+    [:payload       :raw            :*       {}]]
 
    :destination-unreachable
-   [[:unused        :uint32         4        0]
-    [:orig-packet   :raw            :*       nil]]
+   [[:unused        :uint32         4        {:default 0}]
+    [:orig-packet   :raw            :*       {}]]
 
    :redirect
-   [[:gw-addr       :ipv4           4        ""]
-    [:orig-packet   :raw            :*       nil]]})
+   [[:gw-addr       :ipv4           4        {:default ""}]
+    [:orig-packet   :raw            :*       {}]]})
 
 (def ICMP-HEADER
-;;  name,          type,           length,  default,  extra-context
-  [[:type          :msg-type       1        0]
-   [:code          :uint8          1        0]
-   [:checksum      :uint16         2        0]
-   [:data          :icmp-data      :*       nil       {:type-headers
-                                                       ICMP-TYPE-HEADERS} ]])
+;;  name,          type,         length,    extra-context
+  [[:type          :msg-type       1        {:default 0}]
+   [:code          :uint8          1        {:default 0}]
+   [:checksum      :uint16         2        {:default 0}]
+   [:data          :icmp-data      :*       {:type-headers
+                                             ICMP-TYPE-HEADERS} ]])
 
 (defn read-icmp-data [buf start end ctx]
   (let [msg-type (get-in ctx [:msg-map :type])

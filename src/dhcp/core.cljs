@@ -32,7 +32,7 @@
 
 ;; https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
 (def OPTS-LIST
-  ;; code,  name,                type          extra context
+  ;; code,  name,                type          extra-context
   (into
     [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
      [1   :opt/netmask           :ipv4         nil]
@@ -74,26 +74,26 @@
                  [:reserved   :int   15]])
 
 (def DHCP-HEADER
-;;  name,          type,    length,  default,                 extra-context
-  [[:op            :uint8        1     0                      nil]
-   [:htype         :uint8        1     1                      nil]
-   [:hlen          :uint8        1     6                      nil]
-   [:hops          :uint8        1     0                      nil]
-   [:xid           :uint32       4     0                      nil]
-   [:secs          :uint16       2     0                      nil]
-   [:flags         :bitfield     2     nil                    {:spec DHCP-FLAGS}]
-   [:ciaddr        :ipv4         4     "0.0.0.0"              nil]
-   [:yiaddr        :ipv4         4     "0.0.0.0"              nil]
-   [:siaddr        :ipv4         4     "0.0.0.0"              nil] ;; next server
-   [:giaddr        :ipv4         4     "0.0.0.0"              nil]
-   [:chaddr        :mac          6     "00:00:00:00:00:00"    nil]
-   [:chaddr-extra  :raw          10    [0 0 0 0 0 0 0 0 0 0]  nil]
-   [:sname         :str          64    ""                     nil]
-   [:bootfile      :str          128   ""                     nil] ;; :file
-   [:cookie        :raw          4     [99 130 83 99]         nil]
-   [:options       :tlv-map      :*    nil                    {:tlv-tsize 1
-                                                               :tlv-lsize 1
-                                                               :lookup OPTS-LOOKUP}]])
+;;  name,          type,      length,  extra-context
+  [[:op            :uint8        1     {:default 0}]
+   [:htype         :uint8        1     {:default 1}]
+   [:hlen          :uint8        1     {:default 6}]
+   [:hops          :uint8        1     {:default 0}]
+   [:xid           :uint32       4     {:default 0}]
+   [:secs          :uint16       2     {:default 0}]
+   [:flags         :bitfield     2     {:default 0 :spec DHCP-FLAGS}]
+   [:ciaddr        :ipv4         4     {:default "0.0.0.0"}]
+   [:yiaddr        :ipv4         4     {:default "0.0.0.0"}]
+   [:siaddr        :ipv4         4     {:default "0.0.0.0"}] ;; next server
+   [:giaddr        :ipv4         4     {:default "0.0.0.0"}]
+   [:chaddr        :mac          6     {:default "00:00:00:00:00:00"}]
+   [:chaddr-extra  :raw          10    {:default [0 0 0 0 0 0 0 0 0 0]}]
+   [:sname         :str          64    {:default ""}]
+   [:bootfile      :str          128   {:default ""}] ;; :file
+   [:cookie        :raw          4     {:default [99 130 83 99]}]
+   [:options       :tlv-map      :*    {:tlv-tsize 1
+                                        :tlv-lsize 1
+                                        :lookup OPTS-LOOKUP}]])
 
 (def HEADERS-FIXED {:htype  1
                     :hlen   6
@@ -115,9 +115,9 @@
 ;; Generated from protocol
 
 (def DHCP-DEFAULTS
-  (into {} (for [[fname  _ _ fdefault _] DHCP-HEADER
-                 :when fdefault]
-             [fname fdefault])))
+  (into {} (for [[fname  _ _ {:keys [default]}] DHCP-HEADER
+                 :when default]
+             [fname default])))
 
 (def MSG-TYPE-LOOKUP
   (merge (into {} (map (fn [[n m r b]] [n m]) MSG-TYPE-LIST))
@@ -129,6 +129,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General DHCP message reading/writing
+
 (set! *warn-on-infer* false)
 
 (def readers
@@ -186,5 +187,6 @@
        :opt/router         (:address srv-if)
        :opt/dhcp-server-id (:address srv-if)
        :opt/broadcast      (:broadcast srv-if)
-       :opt/dns-servers    [(:address srv-if)]})))
+       :opt/dns-servers    [(:address srv-if)]}
+      HEADERS-FIXED)))
 

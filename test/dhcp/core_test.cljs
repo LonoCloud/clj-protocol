@@ -52,8 +52,7 @@
        :chaddr "01:02:03:04:06:07"}
       {:address "5.6.7.8"
        :netmask "255.255.255.0"
-       :broadcast "5.6.7.255"})
-    dhcp/HEADERS-FIXED))
+       :broadcast "5.6.7.255"})))
 
 
 (deftest test-basic-dhcp

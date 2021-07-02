@@ -39,6 +39,17 @@
    {:optimizations :simple
     :source-map-use-fs-paths true}}
 
+  :read-pcap
+  {:target :node-script
+   :main pcap.core/main
+   :output-to "build/read-pcap.js"
+   ;; Don't try and connect back to shadow-cljs process
+   :devtools {:enabled false :console-support false}
+
+   :compiler-options
+   {:optimizations :simple
+    :source-map-use-fs-paths true}}
+
   :test
   {:target :node-test
    :output-to "build/test.js"

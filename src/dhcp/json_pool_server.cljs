@@ -1,5 +1,6 @@
 (ns dhcp.json-pool-server
-  (:require [dhcp.core :as dhcp]
+  (:require [protocol.fields :as fields]
+            [dhcp.core :as dhcp]
             [dhcp.node-server :as server]
             [clojure.walk :refer [postwalk]]))
 
@@ -29,14 +30,26 @@
       (do
         (println "Loading leases file:" leases-file)
         (reset! pool (load-pool cfg)))
-      (let [[start-ip end-ip] (dhcp/network-start-end address netmask true)]
+      (let [[start-ip end-ip] (fields/network-start-end address netmask true)]
         (println "Creating new leases file:" leases-file)
         (reset! pool {:ranges [{:start start-ip :end end-ip}]
                       :ip-to-mac {}
                       :mac-to-ip {}})
         (save-pool cfg @pool)))))
 
-(defn -main [if-name & args]
+(defn log-message [cfg msg-map]
+  (let [msg-type (:opt/msg-type msg-map)
+        mac (fields/octet->mac (:chaddr msg-map))]
+    (if (#{:DISCOVER :REQUEST} msg-type)
+      (println "Received" msg-type "for" mac)
+      (println "Sent" (:opt/msg-type msg-map)
+               "message with" (fields/octet->ip (:yiaddr msg-map)) "/" mac))))
+
+(defn log-lease [cfg msg-map cur-ip ip chaddr]
+  (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr))
+
+
+(defn main [if-name & args]
   (when-not if-name
     (println "Must specify an interface name")
     (.exit js/process 0))
@@ -44,6 +57,7 @@
   (let [if-info (server/get-if-ipv4 if-name)
         cfg {:message-handler server/pool-handler
              :leases-file "dhcp-leases.json"
+             :log-msg log-message
              :pool pool
              :load-pool load-json-pool
              :save-pool save-json-pool
@@ -55,7 +69,7 @@
 
 ;; Only set main if we are being run
 ;;(try
-;;  (when (re-seq #"json_pool_server" (.-id js/module))
+;;  (when (re-seq #"realm_server" (.-id js/module))
 ;;    (set! *main-cli-fn* -main))
 ;;  (catch :default exc nil))
 

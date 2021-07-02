@@ -1,0 +1,34 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src/" "test/"]
+
+ :dependencies
+ []
+
+ :builds
+ {:client
+  {:target :node-script
+   :main dhcp.node-client/main
+   :output-to "client.js"
+
+   :compiler-options
+   {:optimizations :simple
+    :source-map-use-fs-paths true}}
+
+  :server
+  {:target :node-script
+   :main dhcp.json-pool-server/main
+   :output-to "server.js"
+
+   :compiler-options
+   {:optimizations :simple
+    :source-map-use-fs-paths true}}
+
+  :test
+  {:target :node-test
+   :output-to "protocol-test.js"
+
+   :compiler-options
+   {:optimizations :simple
+    :source-map-use-fs-paths true}}
+  }}

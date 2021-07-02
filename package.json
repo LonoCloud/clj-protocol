@@ -1,5 +1,14 @@
 {
+  "name": "clj-protocol",
+  "description": "clj-protocol - Declarative protocol library",
+  "repository": "https://git.viasat.com/SDP-ScaleSimulator/SimulationService",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "devDependencies": {
+    "shadow-cljs": "2.14.4"
+  },
   "dependencies": {
-    "ffi": "^2.2.0"
+    "@saleae/ffi": "^3.0.2",
+    "fs-extra": "^3.0.1",
+    "minimist": "^1.2.0"
   }
 }

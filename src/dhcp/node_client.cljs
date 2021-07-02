@@ -1,5 +1,6 @@
 (ns dhcp.node-client
-  (:require [dhcp.core :as dhcp]
+  (:require [protocol.fields :as fields]
+            [dhcp.core :as dhcp]
             ;; Move get-if-ipv4 to more generic location
             [dhcp.node-server :as server]))
 
@@ -7,9 +8,9 @@
 
 (defn client-message-handler [cfg msg resp-addr]
   (let [{:keys [sock]} cfg
-        resp-ip (dhcp/octet->ip resp-addr)
+        resp-ip (fields/octet->ip resp-addr)
         msg-map (when msg
-                  (dhcp/read-message (-> msg .toJSON .-data js->clj)))
+                  (dhcp/read-dhcp msg))
         msg-type (:opt/msg-type msg-map)
         resp-msg-map (condp = msg-type
                        nil    {:op 1 :opt/msg-type :DISCOVER}
@@ -20,26 +21,26 @@
                                               msg-type))))]
     (when msg-map
       (println "Received" msg-type
-               "message from" (dhcp/octet->ip (:siaddr msg-map))))
+               "message from" (fields/octet->ip (:siaddr msg-map))))
     (if resp-msg-map
-      (let [buf (js/Buffer. (clj->js (dhcp/write-message resp-msg-map)))]
+      (let [buf (dhcp/write-dhcp resp-msg-map)]
         (.send sock buf 0 (.-length buf) dhcp/RECV-PORT resp-ip
                #(if %1
                   (println "Send failed:" %1)
                   (println "Sent" (:opt/msg-type resp-msg-map)
                            "to" resp-ip))))
-      (println "Got address:" (dhcp/octet->ip (:yiaddr msg-map))))))
+      (println "Got address:" (fields/octet->ip (:yiaddr msg-map))))))
 
 ;; TODO: - lease renewal
 ;;       - sending out MAC
-(defn -main [if-name & [server-ip & args]]
+(defn main [if-name & [server-ip & args]]
   (when-not if-name
     (println "Must specify an interface name")
     (.exit js/process 0))
 
   (let [if-info (server/get-if-ipv4 if-name)
         bcast-addr (:broadcast (:octets if-info))
-        server-addr (if server-ip (dhcp/ip->octet server-ip) bcast-addr)
+        server-addr (if server-ip (fields/ip->octet server-ip) bcast-addr)
         sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
         cfg {:sock sock}
         sock (doto sock

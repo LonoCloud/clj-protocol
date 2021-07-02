@@ -48,10 +48,7 @@
    [:payload    :choice       :*        {:choice-on :ethertype
                                          :choices ETHERTYPE-MAP}]])
 
-(def packet-readers
-  (merge fields/readers-BE
-         addrs/readers
-         header/readers))
+(def packet-readers (merge fields/readers-BE addrs/readers header/readers))
 
 (def RECORD-HEADER
   ;;name,       type,       length,   default,  extra-context
@@ -80,14 +77,12 @@
    [:records    :loop        :*       {:loop-type :header
                                        :spec RECORD-HEADER}]])
 
-(def readers
-  (merge fields/readers-LE
-         header/readers))
+(def trace-readers (merge fields/readers-LE header/readers))
 
 (defn parse-file [path]
   (let [buf (.readFileSync fs path)]
     (header/read-header buf 0 (.-length buf)
-                        {:readers readers 
+                        {:readers trace-readers
                          :spec PCAP-HEADER})))
 
 (defn main [path]

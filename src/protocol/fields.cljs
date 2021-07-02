@@ -37,9 +37,6 @@
     (.fill dbuf sbuf off tend)
     tend))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Compound reader and writer functions
-
 (defn bytes->bitfield [byts spec]
   (let [bits (bytes->bits byts)]
     (first
@@ -58,6 +55,41 @@
                                               (.toString i 2)))]
                 (into res bs)))
             [] spec)))
+
+(defn list->lookup
+  "Takes columnar collection and one or more [k-idx v-idx] pairs and
+  returns a map contructed from key/value pairs selected from
+  'k-idx'/'v-idx' columns of 'coll'. If 'v-idx' does not exist for
+  a given row then the value defaults to nil."
+  [coll & idxs]
+  (reduce (fn [m [ki vi]]
+            (merge m (zipmap (map #(nth % ki)     coll)
+                             (map #(nth % vi nil) coll))))
+          {}
+          idxs))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Compound reader and writer functions
+
+(defn read-lookup
+  [buf start end {:keys [readers lookup-type lookup] :as ctx}]
+  (let [reader (readers lookup-type)
+        _ (assert reader (str "Unknown lookup type " lookup-type))
+        k (reader buf start end ctx)
+        v (get lookup k)]
+    (assert v (str "Key " k " not found in lookup"))
+    v))
+
+(defn write-lookup
+  [buf k start {:keys [writers lookup-type lookup] :as ctx}]
+  (let [writer (writers lookup-type)
+        _ (assert writer (str "Unknown lookup type " lookup-type))
+        v (get lookup k)]
+    (assert v (str "Key " k " not found in lookup"))
+    (writer buf v start ctx)))
+
+;;;
 
 (defn read-repeat
   [buf start end {:keys [readers repeat-type repeat-size] :as ctx}]
@@ -153,6 +185,7 @@
    :raw       #(vec (.slice %1 %2 %3))
    :str       #(.replace (.toString %1 "utf8" %2 %3) remove-null-re "")
    :uint8     #(.readUInt8 %1 %2)
+   :lookup    read-lookup
    :repeat    read-repeat
    :loop      read-loop
    :choice    read-choice})
@@ -180,6 +213,7 @@
    :raw       #(arr-fill %1 %2 %3)
    :str       #(do (.write %1 %2 %3 "utf8") (+ (.-length %2) %3))
    :uint8     #(.writeUInt8 %1 %2 %3)
+   :lookup    write-lookup
    :repeat    write-repeat
    :loop      write-loop
    :choice    write-choice})

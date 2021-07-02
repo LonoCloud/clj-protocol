@@ -23,9 +23,7 @@
    [42  :extended-echo-request    ]
    [43  :extended-echo-reply      ]
    [18  :address-mask-reply       ]])
-(def MSG-TYPE-LOOKUP
-  (merge (into {} (map (fn [[c n]] [c n]) MSG-TYPE-LIST))
-         (into {} (map (fn [[c n]] [n c]) MSG-TYPE-LIST))))
+(def MSG-TYPE-LOOKUP (fields/list->lookup MSG-TYPE-LIST [0 1] [1 0]))
 
 (def MSG-TYPE-HEADERS
   ;; msg-type           name,          type,         length,    extra-context
@@ -39,38 +37,20 @@
                        [:orig-packet   :raw            :*       {}]]
    :redirect          [[:gw-addr       :ipv4           4        {:default ""}]
                        [:orig-packet   :raw            :*       {}]]})
-
 (def MSG-TYPE-MAP
   (into {} (for [[k v] MSG-TYPE-HEADERS] [k {:choice-type :header :spec v}])))
 
 (def ICMP-HEADER
 ;;  name,          type,         length,    extra-context
-  [[:type          :msg-type       1        {:default 0}]
+  [[:type          :lookup         1        {:lookup-type :uint8
+                                             :lookup MSG-TYPE-LOOKUP}]
    [:code          :uint8          1        {:default 0}]
    [:checksum      :uint16         2        {:default 0}]
    [:data          :choice         :*       {:choice-on :type
-                                             :choices MSG-TYPE-MAP} ]])
+                                             :choices MSG-TYPE-MAP}]])
 
-(set! *warn-on-infer* false)
-
-(def readers
-  (merge
-    fields/readers-BE
-    addrs/readers
-    header/readers
-    {:msg-type  #(let [tnum (.readUInt8 %1 %2)
-                       typ (get MSG-TYPE-LOOKUP tnum)]
-                  (assert typ (str "Unknown ICMP message type " tnum))
-                  typ)}))
-
-(def writers
-  (merge
-    fields/writers-BE
-    addrs/writers
-    header/writers
-    {:msg-type   #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)}))
-
-(set! *warn-on-infer* true)
+(def readers (merge fields/readers-BE addrs/readers header/readers))
+(def writers (merge fields/writers-BE addrs/writers header/writers))
 
 (defn read-icmp [buf]
   (header/read-header-full buf 0 (.-length buf)

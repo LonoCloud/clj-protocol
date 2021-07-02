@@ -25,9 +25,9 @@
   ;; /usr/include/linux/in.h
   {:IPPROTO_IP     0
    :SOL_IP         0 ;; Same as above but deprecated
-   :SOL_SOCKET     1 
+   :SOL_SOCKET     1
    :IPPROTO_ICMP   1
-   :IPPROTO_TCP    6 
+   :IPPROTO_TCP    6
    :IPPROTO_UDP   17})
 
 (def OPTIONS*
@@ -64,7 +64,7 @@
         fd (.socket bindings domain typ protocol)]
     (if (< fd 0)
       (throw (js/Error. (str "Could not " f-str ", Errno:" (.errno ffi))))
-      (do 
+      (do
         (println "Called" f-str "sucessfully. Result:" fd)
         fd))))
 

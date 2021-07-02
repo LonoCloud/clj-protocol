@@ -7,10 +7,24 @@
 (def MAX-BUF-SIZE 1500)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; DHCP spec defined values (uppercased)
+;; DHCP spec defined
 
 (def RECV-PORT 67)
 (def SEND-PORT 68)
+
+(def MSG-TYPE-LIST [;; num,  message, resp, broadcast
+                    [1   :DISCOVER     :OFFER true]
+                    [2   :OFFER        nil    nil]
+                    [3   :REQUEST      :ACK   true]
+                    [4   :DECLINE      nil    nil] ;; We don't currently handle decline
+                    [5   :ACK          nil    nil]
+                    [6   :NAK          nil    nil]
+                    [7   :RELEASE      :ACK   false]
+                    [8   :INFORM       :ACK   false]])
+
+(def MSG-TYPE-LOOKUP (fields/list->lookup MSG-TYPE-LIST [0 1] [1 0]))
+(def MSG-TYPE-RESP-LOOKUP (fields/list->lookup MSG-TYPE-LIST [1 2]))
+(def MSG-TYPE-BCAST-LOOKUP (fields/list->lookup MSG-TYPE-LIST [1 3]))
 
 ;; https://datatracker.ietf.org/doc/html/rfc3046
 (def OPTS-RELAY-AGENT-LIST
@@ -31,10 +45,12 @@
 (def OPTS-ETHERBOOT-LOOKUP (tlvs/tlv-list->lookup OPTS-ETHERBOOT-LIST))
 
 ;; https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
+;; 53/msg-type is typically sent first
 (def OPTS-LIST
   ;; code,  name,                type          extra-context
   (into
-    [[53  :opt/msg-type          :msg-type     nil] ;; Typically sent first
+    [[53  :opt/msg-type          :lookup       {:lookup-type :uint8
+                                                :lookup MSG-TYPE-LOOKUP}]
      [1   :opt/netmask           :ipv4         nil]
      [3   :opt/router            :ipv4         nil]
      [4   :opt/time-servers      :repeat       {:repeat-type :ipv4 :repeat-size 4}]
@@ -100,56 +116,16 @@
                     :hops   0 ;; fixed until relay supported
                     :cookie [99 130 83 99]}) ;; 0x63825363
 
-(def MSG-TYPE-LIST [;; num,  message, resp, broadcast
-                    [1   :DISCOVER     :OFFER true]
-                    [2   :OFFER        nil    nil]
-                    [3   :REQUEST      :ACK   true]
-                    [4   :DECLINE      nil    nil] ;; We don't currently handle decline
-                    [5   :ACK          nil    nil]
-                    [6   :NAK          nil    nil]
-                    [7   :RELEASE      :ACK   false]
-                    [8   :INFORM       :ACK   false]])
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Generated from protocol
-
 (def DHCP-DEFAULTS
   (into {} (for [[fname  _ _ {:keys [default]}] DHCP-HEADER
                  :when default]
              [fname default])))
 
-(def MSG-TYPE-LOOKUP
-  (merge (into {} (map (fn [[n m r b]] [n m]) MSG-TYPE-LIST))
-         (into {} (map (fn [[n m r b]] [m n]) MSG-TYPE-LIST))))
-(def MSG-TYPE-RESP-LOOKUP
-  (into {} (map (fn [[n m r b]] [m r]) MSG-TYPE-LIST)))
-(def MSG-TYPE-BCAST-LOOKUP
-  (into {} (map (fn [[n m r b]] [m b]) MSG-TYPE-LIST)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General DHCP message reading/writing
 
-(set! *warn-on-infer* false)
-
-(def readers
-  (merge
-    fields/readers-BE
-    addrs/readers
-    tlvs/readers
-    {:msg-type #(get MSG-TYPE-LOOKUP (.readUInt8 %1 %2))}))
-
-(def writers
-  (merge
-    fields/writers-BE
-    addrs/writers
-    tlvs/writers
-    {:msg-type #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)}))
-
-(set! *warn-on-infer* true)
-
-;;;
-
+(def readers (merge fields/readers-BE addrs/readers tlvs/readers))
+(def writers (merge fields/writers-BE addrs/writers tlvs/writers))
 
 (defn read-dhcp [buf]
   ;; Merge options up into the top level map

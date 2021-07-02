@@ -3,15 +3,20 @@
             [clojure.string :as string]
             [protocol.fields :as fields]
             [protocol.tlvs :as tlvs]
-            [protocol.header :as header]))
+            [protocol.header :as header]
+            [protocol.util :as util]))
 
 (defn parse-raw-msg [s]
   (.from js/Buffer (clj->js (for [oct (string/split s #"\s+")]
                               (js/parseInt (str "0x" oct))))))
 
+(def MSG-TYPE-LIST [[1 :MSG1] [2 :MSG2]])
+(def MSG-TYPE-LOOKUP (fields/list->lookup MSG-TYPE-LIST [0 1] [1 0]))
+
 (def TLV-LIST
-  [;; code, name,             type
-   [1       :tlv/msg-type     :msg-type ]
+  [;; code, name,             type,     extra-context
+   [1       :tlv/msg-type     :lookup   {:lookup-type :uint8
+                                         :lookup MSG-TYPE-LOOKUP}]
    [2       :tlv/address      :raw      ]
    [3       :tlv/hostname     :str      ]
    [4       :tlv/hops         :uint8    ]])
@@ -83,7 +88,7 @@
                                     :tlv-lsize 2}]])
 (def HEADER-3c
   [[:host   :str          6        {:default "abcdef"}]])
-(def HEADER-3 
+(def HEADER-3
   [[:op     :uint8        1        {:default 0}]
    [:data-b :header       :*       {:spec HEADER-3b}]
    [:data-c :header       :*       {:spec HEADER-3c}]])
@@ -100,26 +105,8 @@
 ;;;;;;;;;;;;;;;;;
 
 
-(def MSG-TYPE-LIST [[1 :MSG1] [2 :MSG2]])
-(def MSG-TYPE-LOOKUP
-  (merge (into {} (map (fn [[n m]] [n m]) MSG-TYPE-LIST))
-         (into {} (map (fn [[n m]] [m n]) MSG-TYPE-LIST))))
-
-(set! *warn-on-infer* false)
-
-(def readers
-  (merge fields/readers-BE
-         tlvs/readers
-         header/readers
-         {:msg-type #(get MSG-TYPE-LOOKUP (.readUInt8 %1 %2))}))
-
-(def writers
-  (merge fields/writers-BE
-         tlvs/writers
-         header/writers
-         {:msg-type #(.writeUInt8 %1 (get MSG-TYPE-LOOKUP %2) %3)}))
-
-(set! *warn-on-infer* true)
+(def readers (merge fields/readers-BE tlvs/readers header/readers))
+(def writers (merge fields/writers-BE tlvs/writers header/writers))
 
 (def TEST-CTX-1 {:readers readers :writers writers :spec HEADER-1})
 (def TEST-CTX-2 {:readers readers :writers writers :spec HEADER-2})

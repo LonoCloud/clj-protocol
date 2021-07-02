@@ -6,15 +6,13 @@
 ;; list of [code, name, internal type, extra-context]
 (defn tlv-list->lookup [tlist]
   {:list tlist
-   :types  (merge (into {} (map (fn [[c n t x]] [c t]) tlist))
-                  (into {} (map (fn [[c n t x]] [n t]) tlist)))
-   :ctxs    (merge (into {} (map (fn [[c n t x]] [c x]) tlist))
-                  (into {} (map (fn [[c n t x]] [n x]) tlist)))
-   :names (into {} (map (fn [[c n t x]] [n c]) tlist))
-   :codes (into {} (map (fn [[c n t x]] [c n]) tlist))})
+   :types (fields/list->lookup tlist [0 2] [1 2])
+   :ctxs  (fields/list->lookup tlist [0 3] [1 3])
+   :names (fields/list->lookup tlist [1 0])
+   :codes (fields/list->lookup tlist [0 1])})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; TLV readers
+;; TLV reader/writer (Type-Length-Value)
 
 (defn read-tlv
   "Takes [buf start end ctx]. Returns [name value] with metadata
@@ -36,20 +34,6 @@
             value ((readers ttype) buf vstart  vend (merge ctx tctx))]
         (vary-meta [tname value] merge {:protocol/end vend})))))
 
-(defn read-tlv-seq
-  [buf start end ctx]
-  (fields/read-loop buf start end (assoc ctx :loop-type :tlv)))
-
-;;;
-
-(defn read-tlv-map
-  [buf start end ctx]
-  (let [tlvs (read-tlv-seq buf start end ctx)]
-    (with-meta (into {} tlvs) (meta tlvs))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; TLV writers
-
 (defn write-tlv
   "Takes [buf [name value] start ctx]. Returns offset after write."
   [buf [tlv-name tlv-value] start {:keys [writers lookup
@@ -70,11 +54,21 @@
             _   ((writers ltype) buf (- end vstart) (+ tlv-tsize start) ctx)]
         end))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TLV collection readers/writers
+
+(defn read-tlv-seq
+  [buf start end ctx]
+  (fields/read-loop buf start end (assoc ctx :loop-type :tlv)))
+
+(defn read-tlv-map
+  [buf start end ctx]
+  (let [tlvs (read-tlv-seq buf start end ctx)]
+    (with-meta (into {} tlvs) (meta tlvs))))
+
 (defn write-tlv-seq
   [buf value start ctx]
   (fields/write-loop buf value start (assoc ctx :loop-type :tlv)))
-
-;;;
 
 (defn write-tlv-map
   "Takes [buf tlv-map tlv-start ctx]. Returns offset after write."

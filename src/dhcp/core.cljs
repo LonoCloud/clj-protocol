@@ -31,7 +31,7 @@
   ;; code, name, type
   [[0x01  :circuit-id     :raw   ]
    [0x02  :remote-id      :raw   ]
-   [0x06  :subscriber-id  :str   ]])
+   [0x06  :subscriber-id  :utf8  ]])
 (def OPTS-RELAY-AGENT-LOOKUP (tlvs/tlv-list->lookup OPTS-RELAY-AGENT-LIST))
 
 (def OPTS-ETHERBOOT-LIST
@@ -40,8 +40,8 @@
    [0x08  :eb-yi-addr     :raw   ]
    [0x51  :eb-scriptlet   :raw   ]
    [0xb2  :eb-use-cached  :uint8 ]
-   [0xbe  :eb-username    :str   ]
-   [0xbf  :eb-password    :str   ]])
+   [0xbe  :eb-username    :utf8  ]
+   [0xbf  :eb-password    :utf8  ]])
 (def OPTS-ETHERBOOT-LOOKUP (tlvs/tlv-list->lookup OPTS-ETHERBOOT-LIST))
 
 ;; https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
@@ -55,8 +55,8 @@
      [3   :opt/router            :ipv4         nil]
      [4   :opt/time-servers      :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [6   :opt/dns-servers       :repeat       {:repeat-type :ipv4 :repeat-size 4}]
-     [12  :opt/hostname          :str          nil]
-     [15  :opt/domainname        :str          nil]
+     [12  :opt/hostname          :utf8         nil]
+     [15  :opt/domainname        :utf8         nil]
      [28  :opt/mtu               :uint16       nil]
      [28  :opt/broadcast         :ipv4         nil]
      [41  :opt/nis-servers       :repeat       {:repeat-type :ipv4 :repeat-size 4}]
@@ -69,7 +69,7 @@
      [59  :opt/rebind-time       :uint32       nil]
      [60  :opt/vendor-class-id   :raw          nil]
      [61  :opt/client-id         :raw          nil]
-     [67  :opt/bootfile          :str          nil]
+     [67  :opt/bootfile          :utf8         nil]
      [82  :opt/relay-agent-info  :tlv-map      {:lookup OPTS-RELAY-AGENT-LOOKUP}]
      [97  :opt/guid              :raw          nil]
      [175 :opt/etherboot         :tlv-map      {:lookup OPTS-ETHERBOOT-LOOKUP}]]
@@ -104,8 +104,8 @@
    [:giaddr        :ipv4         4     {:default "0.0.0.0"}]
    [:chaddr        :mac          6     {:default "00:00:00:00:00:00"}]
    [:chaddr-extra  :raw          10    {:default [0 0 0 0 0 0 0 0 0 0]}]
-   [:sname         :str          64    {:default ""}]
-   [:bootfile      :str          128   {:default ""}] ;; :file
+   [:sname         :utf8         64    {:default ""}]
+   [:bootfile      :utf8         128   {:default ""}] ;; :file
    [:cookie        :raw          4     {:default [99 130 83 99]}]
    [:options       :tlv-map      :*    {:tlv-tsize 1
                                         :tlv-lsize 1

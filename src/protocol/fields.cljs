@@ -183,7 +183,7 @@
 (def readers-base
   {:buf       #(.slice %1 %2 %3)
    :raw       #(vec (.slice %1 %2 %3))
-   :str       #(.replace (.toString %1 "utf8" %2 %3) remove-null-re "")
+   :utf8      #(.replace (.toString %1 "utf8" %2 %3) remove-null-re "")
    :uint8     #(.readUInt8 %1 %2)
    :lookup    read-lookup
    :repeat    read-repeat
@@ -211,7 +211,7 @@
 (def writers-base
   {:buf       #(buf-fill %1 %2 %3)
    :raw       #(arr-fill %1 %2 %3)
-   :str       #(do (.write %1 %2 %3 "utf8") (+ (.-length %2) %3))
+   :utf8      #(do (.write %1 %2 %3 "utf8") (+ (.-length %2) %3))
    :uint8     #(.writeUInt8 %1 %2 %3)
    :lookup    write-lookup
    :repeat    write-repeat

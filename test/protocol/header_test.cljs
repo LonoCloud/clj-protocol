@@ -18,7 +18,7 @@
    [1       :tlv/msg-type     :lookup   {:lookup-type :uint8
                                          :lookup MSG-TYPE-LOOKUP}]
    [2       :tlv/address      :raw      ]
-   [3       :tlv/hostname     :str      ]
+   [3       :tlv/hostname     :utf8     ]
    [4       :tlv/hops         :uint8    ]])
 (def TLV-LOOKUP (tlvs/tlv-list->lookup TLV-LIST))
 
@@ -55,7 +55,7 @@
 (def HEADER-2
   ;; name,  type,         length,  default,  extra context
   [[:op     :uint16       2        {:default 0}]
-   [:host   :str          6        {:default "abcdef"}]
+   [:host   :utf8         6        {:default "abcdef"}]
    [:hops   :tlv          :*       {:lookup TLV-LOOKUP
                                     :tlv-tsize 2
                                     :tlv-lsize 2}]
@@ -87,7 +87,7 @@
                                     :tlv-tsize 2
                                     :tlv-lsize 2}]])
 (def HEADER-3c
-  [[:host   :str          6        {:default "abcdef"}]])
+  [[:host   :utf8         6        {:default "abcdef"}]])
 (def HEADER-3
   [[:op     :uint8        1        {:default 0}]
    [:data-b :header       :*       {:spec HEADER-3b}]

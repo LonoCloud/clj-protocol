@@ -28,7 +28,7 @@
   (println "  test-readers")
   (let [buf (.from js/Buffer (clj->js [65 66 67 68 69 70 71 72 73 74]))
         bit-spec [[:a :int 10] [:b :bool 1] [:c :bool 3] [:d :int 18]]]
-    (doseq [[t v] [[:str       "CDEF"]
+    (doseq [[t v] [[:utf8      "CDEF"]
                    [:uint8     67]
                    [:uint16    17220]
                    [:uint32    1128547654]
@@ -49,7 +49,7 @@
   (println "  test-writers")
   (let [bit-spec [[:a :int 10] [:b :bool 1] [:c :bool 3] [:d :int 18]]]
     (doseq [[t [v1 v2 v3]]
-            {:str       ["CDEF"                 4 [0 0 67 68 69 70  0  0  0  0]]
+            {:utf8      ["CDEF"                 4 [0 0 67 68 69 70  0  0  0  0]]
              :uint8     [67                     1 [0 0 67  0  0  0  0  0  0  0]]
              :uint16    [17220                  2 [0 0 67 68  0  0  0  0  0  0]]
              :uint32    [1128547654             4 [0 0 67 68 69 70  0  0  0  0]]
@@ -102,13 +102,13 @@
   (let [arr [0 0 65 66 67 68 0 0]
         buf (.from js/Buffer (clj->js arr))]
     (println "    readers")
-    (is (= "ABCD" ((freaders :str) buf 2 6)))
+    (is (= "ABCD" ((freaders :utf8) buf 2 6)))
     ;; Test that zero bytes are ignored
-    (is (= "ABCD" ((freaders :str) buf 2 8))))
+    (is (= "ABCD" ((freaders :utf8) buf 2 8))))
   (let [arr [0 0 69 70 71 72 0 0]]
     (println "    writers")
     (let [buf (.alloc js/Buffer 8)]
-      ((fwriters :str) buf "EFGH" 2 6)
+      ((fwriters :utf8) buf "EFGH" 2 6)
       (is (= 0 (.compare buf (.from js/Buffer (clj->js arr)))))
-      (is (= "EFGH" ((freaders :str) buf 2 8))))))
+      (is (= "EFGH" ((freaders :utf8) buf 2 8))))))
 

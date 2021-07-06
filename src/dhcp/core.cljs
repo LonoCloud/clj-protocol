@@ -90,26 +90,26 @@
                  [:reserved   :int   15]])
 
 (def DHCP-HEADER
-;;  name,          type,      length,  extra-context
-  [[:op            :uint8        1     {:default 0}]
-   [:htype         :uint8        1     {:default 1}]
-   [:hlen          :uint8        1     {:default 6}]
-   [:hops          :uint8        1     {:default 0}]
-   [:xid           :uint32       4     {:default 0}]
-   [:secs          :uint16       2     {:default 0}]
-   [:flags         :bitfield     2     {:default 0 :spec DHCP-FLAGS}]
-   [:ciaddr        :ipv4         4     {:default "0.0.0.0"}]
-   [:yiaddr        :ipv4         4     {:default "0.0.0.0"}]
-   [:siaddr        :ipv4         4     {:default "0.0.0.0"}] ;; next server
-   [:giaddr        :ipv4         4     {:default "0.0.0.0"}]
-   [:chaddr        :mac          6     {:default "00:00:00:00:00:00"}]
-   [:chaddr-extra  :raw          10    {:default [0 0 0 0 0 0 0 0 0 0]}]
-   [:sname         :utf8         64    {:default ""}]
-   [:bootfile      :utf8         128   {:default ""}] ;; :file
-   [:cookie        :raw          4     {:default [99 130 83 99]}]
-   [:options       :tlv-map      :*    {:tlv-tsize 1
-                                        :tlv-lsize 1
-                                        :lookup OPTS-LOOKUP}]])
+;;  name,          type,      extra-context
+  [[:op            :uint8     {:default 0}]
+   [:htype         :uint8     {:default 1}]
+   [:hlen          :uint8     {:default 6}]
+   [:hops          :uint8     {:default 0}]
+   [:xid           :uint32    {:default 0}]
+   [:secs          :uint16    {:default 0}]
+   [:flags         :bitfield  {:length 2 :default 0 :spec DHCP-FLAGS}]
+   [:ciaddr        :ipv4      {:default "0.0.0.0"}]
+   [:yiaddr        :ipv4      {:default "0.0.0.0"}]
+   [:siaddr        :ipv4      {:default "0.0.0.0"}] ;; next server
+   [:giaddr        :ipv4      {:default "0.0.0.0"}]
+   [:chaddr        :mac       {:default "00:00:00:00:00:00"}]
+   [:chaddr-extra  :raw       {:length 10 :default [0 0 0 0 0 0 0 0 0 0]}]
+   [:sname         :utf8      {:length 64 :default ""}]
+   [:bootfile      :utf8      {:length 128 :default ""}] ;; :file
+   [:cookie        :raw       {:length 4 :default [99 130 83 99]}]
+   [:options       :tlv-map   {:tlv-tsize 1
+                               :tlv-lsize 1
+                               :lookup OPTS-LOOKUP}]])
 
 (def HEADERS-FIXED {:htype  1
                     :hlen   6
@@ -117,7 +117,7 @@
                     :cookie [99 130 83 99]}) ;; 0x63825363
 
 (def DHCP-DEFAULTS
-  (into {} (for [[fname  _ _ {:keys [default]}] DHCP-HEADER
+  (into {} (for [[fname ftype {:keys [default]}] DHCP-HEADER
                  :when default]
              [fname default])))
 
@@ -129,8 +129,8 @@
 
 (defn read-dhcp [buf]
   ;; Merge options up into the top level map
-  (let [msg-map (header/read-header-full buf 0 (.-length buf)
-                                         {:readers readers :spec DHCP-HEADER})
+  (let [msg-map (header/read-header-full buf 0 {:readers readers
+                                                :spec DHCP-HEADER})
         options (:options msg-map)]
     (dissoc (merge msg-map options)
             :options
@@ -144,8 +144,8 @@
                         [fname (get msg-map fname)]))
         msg-map (merge msg-map HEADERS-FIXED {:options options})
         buf (.alloc js/Buffer MAX-BUF-SIZE)]
-    (header/write-header-full buf msg-map 0
-                              {:writers writers :spec DHCP-HEADER})))
+    (header/write-header-full buf msg-map 0 {:writers writers
+                                             :spec DHCP-HEADER})))
 
 
 (defn default-response [msg-map srv-if]

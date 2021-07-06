@@ -23,15 +23,16 @@
 (def TLV-LOOKUP (tlvs/tlv-list->lookup TLV-LIST))
 
 (def HEADER-1
-  ;; name,  type,         length,  default,  extra context
-  [[:op     :uint8        1        {:default 0}]
-   [:xid    :uint32       4        {:default 0}]
-   [:flags  :bitfield     2        {:spec [[:bflag1  :bool   1]
-                                           [:iflag2  :int   12]
-                                           [:iflag3  :int    3]]}]
-   [:tlvs   :tlv-map      :*       {:lookup TLV-LOOKUP
-                                    :tlv-tsize 1
-                                    :tlv-lsize 1}]])
+  ;; name,  type,         default,  extra context
+  [[:op     :uint8        {:default 0}]
+   [:xid    :uint32       {:default 0}]
+   [:flags  :bitfield     {:length 2
+                           :spec [[:bflag1  :bool   1]
+                                  [:iflag2  :int   12]
+                                  [:iflag3  :int    3]]}]
+   [:tlvs   :tlv-map      {:lookup TLV-LOOKUP
+                           :tlv-tsize 1
+                           :tlv-lsize 1}]])
 
 (def TEST-MSG-1-STR
   "01
@@ -53,15 +54,16 @@
 ;;;
 
 (def HEADER-2
-  ;; name,  type,         length,  default,  extra context
-  [[:op     :uint16       2        {:default 0}]
-   [:host   :utf8         6        {:default "abcdef"}]
-   [:hops   :tlv          :*       {:lookup TLV-LOOKUP
-                                    :tlv-tsize 2
-                                    :tlv-lsize 2}]
-   [:tlvs   :tlv-seq      :*       {:lookup TLV-LOOKUP
-                                    :tlv-tsize 2
-                                    :tlv-lsize 2}]])
+  ;; name,  type,         default,  extra context
+  [[:op     :uint16       {:default 0}]
+   [:host   :utf8         {:length 6
+                           :default "abcdef"}]
+   [:hops   :tlv          {:lookup TLV-LOOKUP
+                           :tlv-tsize 2
+                           :tlv-lsize 2}]
+   [:tlvs   :tlv-seq      {:lookup TLV-LOOKUP
+                           :tlv-tsize 2
+                           :tlv-lsize 2}]])
 
 (def TEST-MSG-2-STR
   "00 03
@@ -83,15 +85,16 @@
 
 ;;  name,   type,         length,  default,  extra context
 (def HEADER-3b
-  [[:hops   :tlv          :*       {:lookup TLV-LOOKUP
-                                    :tlv-tsize 2
-                                    :tlv-lsize 2}]])
+  [[:hops   :tlv          {:lookup TLV-LOOKUP
+                           :tlv-tsize 2
+                           :tlv-lsize 2}]])
 (def HEADER-3c
-  [[:host   :utf8         6        {:default "abcdef"}]])
+  [[:host   :utf8         {:length 6
+                           :default "abcdef"}]])
 (def HEADER-3
-  [[:op     :uint8        1        {:default 0}]
-   [:data-b :header       :*       {:spec HEADER-3b}]
-   [:data-c :header       :*       {:spec HEADER-3c}]])
+  [[:op     :uint8        {:default 0}]
+   [:data-b :header       {:spec HEADER-3b}]
+   [:data-c :header       {:spec HEADER-3c}]])
 
 (def TEST-MSG-3-STR
   "01
@@ -116,21 +119,24 @@
 
 (deftest test-header-read
   (println "  test-header-read")
-  (let [msg-map1 (header/read-header TEST-MSG-1-BUF 0 nil TEST-CTX-1)
-        msg-map2 (header/read-header TEST-MSG-2-BUF 0 nil TEST-CTX-2)
-        msg-map3 (header/read-header TEST-MSG-3-BUF 0 nil TEST-CTX-3)]
-    ;;(prn :msg-map1 msg-map1)
-    ;;(prn :msg-map2 msg-map2)
-    ;;(prn :msg-map3 msg-map3)
+  (let [[rend1 msg-map1] (header/read-header TEST-MSG-1-BUF 0 TEST-CTX-1)
+        ;;_ (prn :msg-map1 msg-map1)
+        [rend2 msg-map2] (header/read-header TEST-MSG-2-BUF 0 TEST-CTX-2)
+        ;;_ (prn :msg-map2 msg-map2)
+        [rend3 msg-map3] (header/read-header TEST-MSG-3-BUF 0 TEST-CTX-3)
+        ;;_ (prn :msg-map3 msg-map3)
+        ]
     (is (= TEST-MSG-1-MAP msg-map1))
     (is (= TEST-MSG-2-MAP msg-map2))
-    (is (= TEST-MSG-3-MAP msg-map3))))
+    (is (= TEST-MSG-3-MAP msg-map3))
+    ))
 
 (deftest test-header-write
   (println "  test-header-write")
   (let [msg-buf1 (header/write-header-full nil TEST-MSG-1-MAP 0 TEST-CTX-1)
         msg-buf2 (header/write-header-full nil TEST-MSG-2-MAP 0 TEST-CTX-2)
-        msg-buf3 (header/write-header-full nil TEST-MSG-3-MAP 0 TEST-CTX-3)]
+        msg-buf3 (header/write-header-full nil TEST-MSG-3-MAP 0 TEST-CTX-3)
+        ]
     ;;(println (util/pr-buf TEST-MSG-1-BUF {:prefix "TEST-MSG-1-BUF: "}))
     ;;(println (util/pr-buf msg-buf1       {:prefix "      msg-buf1: "}))
     ;;(println (util/pr-buf TEST-MSG-2-BUF {:prefix "TEST-MSG-2-BUF: "}))
@@ -149,11 +155,11 @@
 (deftest test-header-roundtrip
   (println "  test-header-roundtrip")
   (let [msg-buf1 (header/write-header-full nil TEST-MSG-1-MAP 0 TEST-CTX-1)
-        msg-map1 (header/read-header-full msg-buf1 0 nil TEST-CTX-1)
+        msg-map1 (header/read-header-full msg-buf1 0 TEST-CTX-1)
         msg-buf2 (header/write-header-full nil TEST-MSG-2-MAP 0 TEST-CTX-2)
-        msg-map2 (header/read-header-full msg-buf2 0 nil TEST-CTX-2)
+        msg-map2 (header/read-header-full msg-buf2 0 TEST-CTX-2)
         msg-buf3 (header/write-header-full nil TEST-MSG-3-MAP 0 TEST-CTX-3)
-        msg-map3 (header/read-header-full msg-buf3 0 nil TEST-CTX-3)]
+        msg-map3 (header/read-header-full msg-buf3 0 TEST-CTX-3)]
     (is (= TEST-MSG-1-MAP msg-map1))
     (is (= TEST-MSG-2-MAP msg-map2))
     (is (= TEST-MSG-3-MAP msg-map3))))

@@ -1,6 +1,7 @@
 (ns icmp.core-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as string]
+            [protocol.util :as util]
             [icmp.core :as icmp]))
 
 (defn parse-raw-msg [s]
@@ -33,12 +34,13 @@
 (deftest test-icmp-echo
   (println "  test-icmp-echo")
   (let [echo-buf (.from js/Buffer (clj->js ECHO-ARR))
-        msg (icmp/read-icmp echo-buf)
-        buf (icmp/write-icmp msg)
+        msg1 (icmp/read-icmp echo-buf)
+        ;;_ (prn :msg1 msg1)
+        buf (icmp/write-icmp msg1)
         msg2 (icmp/read-icmp buf)]
-    (is (= ECHO-MSG msg))
-    ;;(js/console.log "orig BUF:" echo-buf)
-    ;;(js/console.log "res  BUF:" buf)
+    (is (= ECHO-MSG msg1))
+    ;;(println (util/pr-buf echo-buf {:prefix "echo-buf:  "}))
+    ;;(println (util/pr-buf buf      {:prefix "buf:       "}))
     (is (= 0 (.compare echo-buf buf)))
     (is (= ECHO-MSG msg2))))
 

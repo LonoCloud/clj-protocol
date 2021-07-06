@@ -54,8 +54,8 @@
 ;;;
 
 (def readers
-  {:ipv4      #(octet->ip (.slice %1 %2 (+ 4 %2)))
-   :mac       #(octet->mac (.slice %1 %2 (+ 6 %2)))})
+  {:ipv4      #(let [e (+ 4 %2)] [e (octet->ip (.slice %1 %2 e))])
+   :mac       #(let [e (+ 6 %2)] [e (octet->mac (.slice %1 %2 (+ 6 %2)))])})
 
 (def writers
   {:ipv4      #(fields/arr-fill %1 (ip->octet %2) %3 4)

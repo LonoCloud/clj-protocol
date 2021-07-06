@@ -1,6 +1,7 @@
 (ns dhcp.core-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as string]
+            [protocol.util :as util]
             [dhcp.core :as dhcp]))
 
 (defn parse-raw-msg [s]
@@ -61,8 +62,7 @@
         ;;_ (prn :msg msg)
         buf (dhcp/write-dhcp msg)]
     (is (= BASIC-MSG-MAP msg))
-    ;;(js/console.log "orig buf -240:" (.slice BASIC-MSG-BUF 200))
-    ;;(js/console.log "res  buf -240:" (.slice buf 200))
+    ;;(println (util/pr-bufs [BASIC-MSG-BUF buf] {:prefix "  "}))
     (is (= 0 (.compare BASIC-MSG-BUF buf)))))
 
 (deftest test-default-dhcp
@@ -70,8 +70,8 @@
   (let [msg-before DEFAULT-MSG
         ;;_ (prn :msg-before msg-before)
         buf (dhcp/write-dhcp DEFAULT-MSG)
+        ;;_ (println (util/pr-buf buf {:prefix "  "}))
         msg-after (dhcp/read-dhcp buf)]
-    ;;(js/console.log "buf 240-:" (.slice buf 240))
     ;;(prn :before (sort (keys msg-before)))
     ;;(prn :after- (sort (keys msg-after)))
     (is (= (sort (keys msg-before))

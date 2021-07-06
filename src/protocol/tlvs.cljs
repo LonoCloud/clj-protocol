@@ -17,22 +17,22 @@
 (defn read-tlv
   "Takes [buf start end ctx]. Returns [name value] with metadata
   '{:protocol/end end}' (where 'end' is offset after read)."
-  [buf start end {:keys [readers lookup tlv-tsize tlv-lsize] :as ctx}]
+  [buf start {:keys [readers lookup tlv-tsize tlv-lsize] :as ctx}]
   (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
-        code ((readers ctype) buf start nil ctx)
+        [_ code] ((readers ctype) buf start ctx)
         ttype (get-in lookup [:types code])
         _ (assert ttype (str "No TLV lookup definition for code " code))
         tname (get-in lookup [:codes code])
-        tctx (get-in lookup [:ctxs code])]
+        tctx (get-in lookup [:ctxs code])
+        lstart (+ start tlv-tsize)]
     (if (= :tlv-stop ttype)
-      (vary-meta [tname nil] merge {:protocol/end (+ start tlv-tsize)
-                                    :protocol/stop true})
-      (let [len ((readers ltype) buf (+ tlv-tsize start) nil ctx)
-            vstart (+ tlv-tsize tlv-lsize start)
-            vend   (+ tlv-tsize tlv-lsize start len)
-            value ((readers ttype) buf vstart  vend (merge ctx tctx))]
-        (vary-meta [tname value] merge {:protocol/end vend})))))
+      [lstart [tname nil] true]
+      (let [[_ len] ((readers ltype) buf (+ tlv-tsize start) ctx)
+            vstart (+ lstart tlv-lsize)
+            ctx (merge ctx tctx {:length len})
+            [vend value] ((readers ttype) buf vstart ctx)]
+        [vend [tname value]]))))
 
 (defn write-tlv
   "Takes [buf [name value] start ctx]. Returns offset after write."
@@ -58,13 +58,13 @@
 ;; TLV collection readers/writers
 
 (defn read-tlv-seq
-  [buf start end ctx]
-  (fields/read-loop buf start end (assoc ctx :loop-type :tlv)))
+  [buf start ctx]
+  (fields/read-loop buf start (assoc ctx :loop-type :tlv)))
 
 (defn read-tlv-map
-  [buf start end ctx]
-  (let [tlvs (read-tlv-seq buf start end ctx)]
-    (with-meta (into {} tlvs) (meta tlvs))))
+  [buf start ctx]
+  (let [[fend tlvs] (read-tlv-seq buf start ctx)]
+    [fend (into {} tlvs)]))
 
 (defn write-tlv-seq
   [buf value start ctx]

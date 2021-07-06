@@ -48,7 +48,8 @@
     (doseq [[t v] {:ipv4      "67.68.69.70"
                    :mac       "43:44:45:46:47:48"}]
       (println "    reader" t)
-      (let [res ((freaders t) buf 2 10 {:readers freaders})]
+      (let [[rend res] ((freaders t) buf 2 10 {:readers freaders})]
+        (is (> rend 0))
         (is res)
         (is (= v res))))))
 

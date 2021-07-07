@@ -5,29 +5,37 @@
             [dhcp.node-server :as server]
             [clojure.walk :refer [postwalk]]))
 
-(def fs (js/require "fs"))
-(defn slurp [f] (.readFileSync fs f "utf-8"))
-(defn spit [f data] (.writeFileSync fs f data))
+(def ^{:doc "In-memory cache of JSON pool. Format:
 
-;; {:ranges [{:start <START-IP>
-;;            :end <END-IP>}...]
-;;  :ip-to-mac {<IP> <MAC>...}
-;;  :mac-to-ip {<MAC> <IP>}}
-(def pool (atom nil))
+            ```
+            {:ranges [{:start <START-IP>
+                       :end <END-IP>}...]
+             :ip-to-mac {<IP> <MAC>...}
+             :mac-to-ip {<MAC> <IP>}}
+            ```
+            "}
+  pool (atom nil))
 
-(def kw-set #{"ranges" "start" "end" "ip-to-mac" "mac-to-ip"})
-(defn load-json-pool [cfg]
-  (let [raw (js->clj (js/JSON.parse (slurp (:leases-file cfg))))
+(def ^:private kw-set #{"ranges" "start" "end" "ip-to-mac" "mac-to-ip"})
+(defn load-json-pool
+  "Read JSON pool data from `leases-file`. See format of [[pool]]."
+  [{:keys [leases-file] :as cfg}]
+  (let [raw (js->clj (js/JSON.parse (util/slurp leases-file)))
         f (fn [[k v]] (if (kw-set k) [(keyword k) v] [k v]))]
     (postwalk  (fn [x] (if (map? x) (into {} (map f x)) x)) raw)))
 
-(defn save-json-pool [cfg data]
-  (spit (:leases-file cfg) (js/JSON.stringify (clj->js data))))
+(defn save-json-pool
+  "Write JSON pool data to `leases-file`"
+  [{:keys [leases-file] :as cfg} data]
+  (util/spit leases-file (js/JSON.stringify (clj->js data))))
 
-(defn json-pool-init [cfg]
-  (let [{:keys [leases-file pool save-pool load-pool if-info]} cfg
-        {:keys [address netmask mac]} if-info]
-    (if (.existsSync fs leases-file)
+(defn json-pool-init
+  "Initialize the in-memory `pool` (see [[pool]] for format) either
+  from a `leases-file` if it exists or with an empty pool using
+  `if-info` to specify the pool network ranges."
+  [{:keys [leases-file pool save-pool load-pool if-info] :as cfg}]
+  (let [{:keys [address netmask mac]} if-info]
+    (if (util/existsSync leases-file)
       (do
         (println "Loading leases file:" leases-file)
         (reset! pool (load-pool cfg)))
@@ -38,18 +46,17 @@
                       :mac-to-ip {mac address}})
         (save-pool cfg @pool)))))
 
-(defn first-free [ip-to-mac ranges]
+(defn ^:private first-free [ip-to-mac ranges]
   (let [ips (mapcat #(addrs/ip-seq (:start %1) (:end %1)) ranges)]
     (first (filter #(not (contains? ip-to-mac %1)) ips))))
 
-;; (:pool cfg) should be an atom containing:
-;;     {:ranges [{:start <START-IP>
-;;                :end <END-IP>}...]
-;;      :ip-to-mac {<IP> <MAC>...}
-;;      :mac-to-ip {<MAC> <IP>}}
-(defn pool-handler [cfg msg-map]
-  (let [{:keys [pool save-pool if-info]} cfg
-        chaddr (:chaddr msg-map)
+(defn pool-handler
+  "Takes a parsed DHCP client message `msg-map` and allocates an
+  address from `pool` and responds to the client with that address. If
+  the client MAC was already assigned an address then respond with
+  the same address."
+  [{:keys [pool save-pool if-info] :as cfg} msg-map]
+  (let [chaddr (:chaddr msg-map)
         {:keys [ip-to-mac mac-to-ip ranges]} @pool
         cur-ip (get mac-to-ip chaddr)
         ip (or cur-ip (first-free ip-to-mac ranges))]
@@ -61,7 +68,9 @@
     (assoc (dhcp/default-response msg-map if-info)
       :yiaddr ip)))
 
-(defn log-message [cfg msg-map addr]
+(defn log-message
+  "Print a log message for the message in `msg-map`"
+  [cfg msg-map addr]
   (let [msg-type (:opt/msg-type msg-map)
         mac (:chaddr msg-map)]
     (if (#{:DISCOVER :REQUEST} msg-type)
@@ -69,11 +78,10 @@
       (println "Sent" msg-type "for"  mac "to" addr
                "with yiaddr" (:yiaddr msg-map)))))
 
-(defn log-lease [cfg msg-map cur-ip ip chaddr]
-  (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr))
-
-
-(defn main [if-name & args]
+(defn main
+  "Start a JSON pool DHCP server listening on `if-name` and storing
+  the JSON lease data in 'dhcp-leases.json'"
+  [if-name & args]
   (when-not if-name
     (println "Must specify an interface name")
     (.exit js/process 0))

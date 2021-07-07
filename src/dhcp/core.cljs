@@ -1,4 +1,5 @@
 (ns dhcp.core
+  "DHCP protocol definition."
   (:require [protocol.fields :as fields]
             [protocol.addrs :as addrs]
             [protocol.tlvs :as tlvs]
@@ -124,10 +125,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General DHCP message reading/writing
 
-(def readers (merge fields/readers-BE addrs/readers tlvs/readers))
-(def writers (merge fields/writers-BE addrs/writers tlvs/writers))
+(def ^:private readers (merge fields/readers-BE addrs/readers tlvs/readers))
+(def ^:private writers (merge fields/writers-BE addrs/writers tlvs/writers))
 
-(defn read-dhcp [buf]
+(defn read-dhcp
+  "Read/decode a DHCP payload from `buf`"
+  [buf]
   ;; Merge options up into the top level map
   (let [msg-map (header/read-header-full buf 0 {:readers readers
                                                 :spec DHCP-HEADER})
@@ -136,7 +139,10 @@
             :options
             :opt/end)))
 
-(defn write-dhcp [msg-map]
+(defn write-dhcp
+  "Write/encode an DHCP payload into an allocated js/Buffer using
+  `msg-map`. Returns the allocated buffer sliced to the size written."
+  [msg-map]
   ;; Move options down into :options keys
   (let [options (into {:opt/end 0}
                       (for [fname (map second OPTS-LIST)
@@ -148,7 +154,11 @@
                                              :spec DHCP-HEADER})))
 
 
-(defn default-response [msg-map srv-if]
+(defn default-response
+  "Takes a msg-map containing a `:opt/msg-type` and based on the
+  msg-type and network info from `srv-if`, returns a populated
+  msg-map with default values."
+  [msg-map srv-if]
   (let [msg-type (:opt/msg-type msg-map)]
     (merge
       DHCP-DEFAULTS

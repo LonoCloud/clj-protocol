@@ -1,16 +1,23 @@
 (ns dhcp.node-client
+  "A simple DHCP client."
   (:require [protocol.socket :as socket]
             [dhcp.core :as dhcp]
             [dhcp.util :as util]))
 
-(def minimist (js/require "minimist"))
-(def dgram (js/require "dgram"))
-(def pcap (js/require "pcap"))
+(def ^:private minimist (js/require "minimist"))
+(def ^:private dgram (js/require "dgram"))
+(def ^:private pcap (js/require "pcap"))
 
-(defn client-message-handler [cfg msg]
+(defn client-message-handler
+  "Respond to DHCP messages. Read the DHCP message from `buf`, and
+  depending on the message and configuration in `cfg` send an
+  appropriate response. If `buf` is nil then this means we are
+  responding to a trigger (i.e. send DISCOVER) rather than to an
+  actual received message."
+  [cfg buf]
   (let [{:keys [verbose sock if-name hw-addr server-ip state]} cfg
-        msg-map (when msg
-                  (dhcp/read-dhcp msg))
+        msg-map (when buf
+                  (dhcp/read-dhcp buf))
         msg-type (:opt/msg-type msg-map)
         chaddr (:chaddr msg-map) ]
     (if (and msg-map (not= hw-addr chaddr))
@@ -47,7 +54,13 @@
                                  "to" server-ip))))
             (println "Got address:" (:yiaddr msg-map))))))))
 
-(defn start-pcap-listener [{:keys [hw-addr if-name] :as cfg}]
+(defn start-pcap-listener
+  "Start a pcap listener socket so that we can receive broadcast
+  messages on an interface `if-name` even before we have an address
+  assigned to that interface. We only listen for UDP packets that we
+  didn't send (from `hw-addr`) and that are destined for
+  [[dhcp/SEND-PORT]]"
+  [{:keys [hw-addr if-name] :as cfg}]
   (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
                          " and not ether src " hw-addr)
         psession (.createSession pcap if-name #js {:filter pcap-filter})]
@@ -60,14 +73,20 @@
                         (client-message-handler cfg dhcp)))))))
 
 ;; TODO: - lease renewal
-(defn tick [cfg]
+(defn tick
+  "Periodically trigger DISCOVER messages until we are assigned an
+  address."
+  [cfg]
   (let [{:keys [assigned? last-tx-ts]} @(:state cfg)]
     (when (and (not assigned?)
                (> (.getTime (js/Date.)) (+ 5000 last-tx-ts)))
       ;; Trigger DISCOVER
       (client-message-handler cfg nil))))
 
-(defn main [& args]
+(defn main
+  "Start a DHCP client that will get an address assignment from a DHCP
+  server and update the specified interface address."
+  [& args]
   (let [minimist-opts {:alias {:v :verbose
                                :i :if-name
                                :s :server-ip

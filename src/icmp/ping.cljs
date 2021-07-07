@@ -4,11 +4,13 @@
             [protocol.header :as header]
             [icmp.core :as icmp]))
 
-(def raw (js/require "raw-socket"))
+(def ^:private raw (js/require "raw-socket"))
 
-(def last-seq-num (atom 0))
+(def ^:private last-seq-num (atom 0))
 
-(defn ping [sock targ-ip]
+(defn ping
+  "Send a ping to `targ-ip` using socket `sock`"
+  [sock targ-ip]
   (let [seq-num (swap! last-seq-num inc)
         ping-msg {:type :echo-request
                   :code 0
@@ -25,7 +27,10 @@
                (js/console.log "error sending ping:" err)
                #_(js/console.log "sent" byts))))))
 
-(defn main [targ-ip & args]
+(defn main
+  "Create a raw socket and start sending periodic pings to `targ-ip`
+  and printing the responses."
+  [targ-ip & args]
   (let [sock (.createSocket raw #js {:protocol (.-Protocol.ICMP raw)})]
     (doto sock
       (.on "message" (fn [buf srv]

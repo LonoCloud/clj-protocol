@@ -1,17 +1,21 @@
 (ns dhcp.node-server
+  "Framework for creating DHCP server implementations. Actual "
   (:require [clojure.string :as string]
             [protocol.socket :as socket]
             [dhcp.core :as dhcp]))
 
 (def dgram (js/require "dgram"))
 
-(defn server-message-handler [cfg msg rinfo]
-  (let [{:keys [sock if-info disable-bcast]} cfg
-        msg-map (dhcp/read-dhcp msg)
+(defn server-message-handler
+  "Read/decode DHCP messages from a client, call `message-handler` to
+  get a response map, and then write/encode the response and send it
+  via `sock`."
+  [{:keys [sock message-handler disable-bcast log-msg] :as cfg} buf rinfo]
+  (let [msg-map (dhcp/read-dhcp buf)
         msg-type (:opt/msg-type msg-map)
-        _ (when-let [logfn (:log-msg cfg)]
-            (logfn cfg msg-map nil))
-        resp-msg-map ((:message-handler cfg) cfg msg-map)
+        _ (when log-msg
+            (log-msg cfg msg-map nil))
+        resp-msg-map (message-handler cfg msg-map)
         buf (dhcp/write-dhcp resp-msg-map)
         resp-addr (if (and (not disable-bcast)
                            (dhcp/MSG-TYPE-BCAST-LOOKUP msg-type))
@@ -20,18 +24,20 @@
     (.send sock buf 0 (.-length buf) (:port rinfo) resp-addr
            #(if %1
               (println "Send failed:" %1)
-              (when-let [logfn (:log-msg cfg)]
-                (logfn cfg resp-msg-map (str resp-addr ":" (:port rinfo))))))))
+              (when log-msg
+                (log-msg cfg resp-msg-map (str resp-addr ":" (:port rinfo))))))))
 
-(defn create-server [cfg]
-  (let [{:keys [if-name buffsz]} cfg
-        sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
+(defn create-server
+  "Create a DHCP server listening on `if-name` that will call
+  `message-handler` to get a response message for a client message."
+  [{:keys [if-name buffsz message-handler] :as cfg}]
+  (let [sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
         cfg (assoc cfg :sock sock)]
     (doto sock
       (.on "error" (fn [& err] (prn :err err)))
-      (.on "message" (fn [msg rinfo]
+      (.on "message" (fn [buf rinfo]
                        (server-message-handler
-                        cfg msg (js->clj rinfo :keywordize-keys true))))
+                         cfg buf (js->clj rinfo :keywordize-keys true))))
       (.on "listening" (fn []
                          (socket/set-reuse-port sock)
                          (.setBroadcast sock true)

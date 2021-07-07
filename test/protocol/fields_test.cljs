@@ -84,7 +84,7 @@
   (println "  test-choice")
   (let [base-ctx {:readers freaders
                   :writers fwriters
-                  :choice-on :a
+                  :choice-path [:a]
                   :choices {1 {:choice-type :uint8}
                             2 {:choice-type :uint16}}}]
     (println "    reader")

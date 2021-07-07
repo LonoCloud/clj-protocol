@@ -46,17 +46,22 @@
                             :lookup MSG-TYPE-LOOKUP}]
    [:code        :uint8    {:default 0}]
    [:checksum    :uint16   {:default 0}]
-   [:data        :choice   {:choice-on :type
+   [:data        :choice   {:choice-path [:type]
                             :choices MSG-TYPE-MAP}]])
 
-(def readers (merge fields/readers-BE addrs/readers header/readers))
-(def writers (merge fields/writers-BE addrs/writers header/writers))
+(def ^:private readers (merge fields/readers-BE addrs/readers header/readers))
+(def ^:private writers (merge fields/writers-BE addrs/writers header/writers))
 
-(defn read-icmp [buf]
+(defn read-icmp
+  "Read/decode an ICMP payload from `buf`"
+  [buf]
   (header/read-header-full buf 0 {:readers readers
                                   :spec ICMP-HEADER}))
 
-(defn write-icmp [msg-map]
+(defn write-icmp
+  "Write/encode an ICMP payload into an allocated js/Buffer using
+  `msg-map`. Returns the allocated buffer sliced to the size written."
+  [msg-map]
   (let [buf (.alloc js/Buffer MAX-BUF-SIZE)]
     (header/write-header-full buf msg-map 0 {:writers writers
                                              :spec ICMP-HEADER})))

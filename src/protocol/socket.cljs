@@ -1,7 +1,8 @@
-(ns protocol.socket)
+(ns protocol.socket
+  "Low-level functions for setting socket options")
 
-(def ffi (js/require "@saleae/ffi"))
-(def ref (js/require "ref"))
+(def ^:private ffi (js/require "@saleae/ffi"))
+(def ^:private ref (js/require "ref"))
 
 (def ETH-HDR-LEN 14)
 ;; Assumes no IP options (ihl = 5)
@@ -30,7 +31,7 @@
    :IPPROTO_TCP    6
    :IPPROTO_UDP   17})
 
-(def OPTIONS*
+(def ^:private OPTIONS*
   ;; /usr/include/asm-generic/socket.h
   {:SOL_SOCKET {:SO_REUSEADDR      2
                 :SO_DONTROUTE      5
@@ -50,25 +51,14 @@
   (merge OPTIONS*
          (into {} (map (fn [[o v]] [(get PROTOCOLS o) v]) OPTIONS*))))
 
-(def bindings
+(def ^:private bindings
   (.Library ffi nil
-            (clj->js {"socket"     ["int" ["int" "int" "int"]]
-                      "getsockopt" ["int" ["int" "int" "int" "pointer" "pointer"]]
+            (clj->js {"getsockopt" ["int" ["int" "int" "int" "pointer" "pointer"]]
                       "setsockopt" ["int" ["int" "int" "int" "string" "int"]]})))
 
-(defn socket [domain typ protocol]
-  (let [domain (if (number? domain) domain (get DOMAINS domain))
-        typ (if (number? typ) type (get TYPES typ))
-        protocol (if (number? protocol) protocol (get PROTOCOLS protocol))
-        f-str  (str "socket(" domain ", " typ ", " protocol ")")
-        fd (.socket bindings domain typ protocol)]
-    (if (< fd 0)
-      (throw (js/Error. (str "Could not " f-str ", Errno:" (.errno ffi))))
-      (do
-        (println "Called" f-str "sucessfully. Result:" fd)
-        fd))))
-
-(defn setsockopt [sock level option value]
+(defn setsockopt
+  "Set `level`/`option`/`value` socket options on `sock`"
+  [sock level option value]
   (let [fd (if (number? sock) sock ^number (.-_handle.fd sock))
         level-num (if (number? level) level (get PROTOCOLS level))
         option-num (if (number? option) option (get-in OPTIONS [level option]))
@@ -82,14 +72,29 @@
 
 ;;;
 
-(defn set-freebind [sock]
-  (setsockopt sock :IPPROTO_IP :IP_FREEBIND 1))
-
-(defn set-rcvbuf [sock buffsz]
+(defn set-rcvbuf
+  "Set SOL_SOCKET/SO_RCVBUF socket option on `sock` to update the
+  receive buffer size to `buffsz`"
+  [sock buffsz]
   (setsockopt sock :SOL_SOCKET :SO_RCVBUF buffsz))
 
-(defn bind-to-device [sock ifname]
+(defn bind-to-device
+  "Set SOL_SOCKET/SO_BINDTODEVICE socket option on `sock` to bind the
+  socket to a device named `ifname`"
+  [sock ifname]
   (setsockopt sock :SOL_SOCKET :SO_BINDTODEVICE ifname))
 
-(defn set-reuse-port [sock]
+(defn set-reuse-port
+  "Enable the SOL_SOCKET/SO_REUSEPORT socket option on `sock`"
+  [sock]
   (setsockopt sock :SOL_SOCKET :SO_REUSEPORT 1))
+
+(defn set-reuse-addr
+  "Enable the SOL_SOCKET/SO_REUSEADDR socket option on `sock`"
+  [sock]
+  (setsockopt sock :SOL_SOCKET :SO_REUSEADDR 1))
+
+(defn set-freebind
+  "Enablet eh IPPROTO_IP/IP_FREEBIND socket option on `sock`"
+  [sock] (setsockopt sock :IPPROTO_IP :IP_FREEBIND 1))
+

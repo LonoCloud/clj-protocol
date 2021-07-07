@@ -1,9 +1,10 @@
 (ns pcap.core
+  "A example pcap file format reader"
   (:require [protocol.addrs :as addrs]
             [protocol.fields :as fields]
             [protocol.header :as header]))
 
-(def fs (js/require "fs"))
+(def ^:private fs (js/require "fs"))
 
 ;; https://tools.ietf.org/id/draft-gharris-opsawg-pcap-00.html
 ;; https://github.com/pcapng/pcapng
@@ -44,9 +45,10 @@
   [[:dst-mac    :mac       {:default ""}]
    [:src-mac    :mac       {:default ""}]
    [:ethertype  :uint16    {:default 0}]
-   [:payload    :choice    {:choice-on :ethertype :choices ETHERTYPE-MAP}]])
+   [:payload    :choice    {:choice-path [:ethertype] :choices ETHERTYPE-MAP}]])
 
-(def packet-readers (merge fields/readers-BE addrs/readers header/readers))
+(def ^:private packet-readers
+  (merge fields/readers-BE addrs/readers header/readers))
 
 (def RECORD-HEADER
   ;;name,       type,      extra-context
@@ -75,15 +77,20 @@
    [:fcs-type   :bitfield  {:length 4 :spec LINKTYPE-BITFIELD}]
    [:records    :loop      {:loop-type :header :spec RECORD-HEADER}]])
 
-(def pcap-readers (merge fields/readers-LE header/readers))
+(def ^:private pcap-readers
+  (merge fields/readers-LE header/readers))
 
-(defn parse-file [path]
+(defn- parse-file [path]
   (let [buf (.readFileSync fs path)]
     (header/read-header-full buf 0 {:readers pcap-readers :spec PCAP-HEADER})))
 
-(defn main [path]
+(defn main
+  "Read pcap file at `path` and print header and records"
+  [path]
   (let [trace (parse-file path)]
     (println "File header:")
     (println (dissoc trace :records))
     (println "Records:")
     (doseq [record (:records trace)] (prn record))))
+
+(def -main main) ;; lumo

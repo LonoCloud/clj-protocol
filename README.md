@@ -91,7 +91,7 @@ cljs.user=> (prn (vec buf2))
 ```
 
 
-## Examples
+## Example Programs
 
 [//]: # (This should be kept in sync with docs/examples.md)
 
@@ -107,7 +107,7 @@ Build the examples:
 npx shadow-cljs compile dhcp-client dhcp-server ping-client read-pcap
 ```
 
-## Usage:
+### Usage:
 
 * **DHCP client** - Run a DHCP client on eth0. Listening on port 68
   requires elevated permissions. WARNING: this will attempt to update
@@ -150,34 +150,31 @@ npx shadow-cljs compile test
 node build/test.js
 ```
 
+Use docker-compose and conlink to launch a self-contained network
+environment that runs the DHCP client, server, and ping client.
+
+```
+cd test
+docker-compose up --force-recreate --build
+```
 
 
 ## Creating custom reader/writer functions
 
 - Context should be passed to any internal reader/writer calls.
 
-## API Reference
+## API
 
-### Header Defintions
+All public functions in the `protocol` namespaces have docstrings that
+describe the API.
 
-### Simple Readers / Writers
+You can use leiningen to generate codox documentation in `docs/www`
+like this:
 
-* Numeric types
-* Address types
-* String
-* Raw
-* Buffer
+```
+lein codox
+```
 
-### Compound Readers / Writers
-
-* lookup
-* repeat
-* loop
-* choice
-* bitfield
-  - for little endian bitfields, the bytes that make up the bitfield
-    are reversed before splitting into their component fields.
-* tlvs
 
 ## TODO
 - add signed int value types ?

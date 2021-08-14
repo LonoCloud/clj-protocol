@@ -5,7 +5,9 @@
   where `end` is the offset in `buf` after the read value(s).
 
   Writer functions take `[buf msg-map start ctx]` and return `end`
-  where `end` is the offset in `buf` after the written value(s).")
+  where `end` is the offset in `buf` after the written value(s)."
+
+  (:require [protocol.platform :as plat]))
 
 (def DEFAULT-BUF-SIZE 1500)
 
@@ -17,7 +19,7 @@
   using reader functions in `(:readers ctx)`.
 
   ## Parameters:
-  * `buf`: is the js/Buffer to read from
+  * `buf`: is the buffer to read from
   * `start`: start reading from buf at this offset
   * `ctx`: a map of additional parsing context:
       * `readers`: map of types to reader functions
@@ -37,19 +39,21 @@
   (loop [fields spec
          offset start
          msg-map {}]
-    (if (or (empty? fields) (>= offset (.-length buf)))
+    (if (or (empty? fields) (>= offset (plat/buf-len buf)))
       [offset msg-map]
       (let [[[fname ftype fctx] & fields] fields
-            {:keys [length]} fctx
+            length (:length fctx)
             length (if (= :* length)
-                     (- (.-length buf) offset)
+                     (- (plat/buf-len buf) offset)
                      (or (get msg-map length) length))
+            ;;_ (prn :rh 0 :fname fname :ftype ftype :offset offset :length length)
             reader (readers ftype)
             _ (assert reader (str "No reader for " ftype))
-            ctx (merge ctx fctx {:msg-map msg-map}
+            ctx (merge (dissoc ctx :length)
+                       fctx
+                       {:msg-map msg-map}
                        (when length {:length length}))
             [fend value] (reader buf offset ctx)
-            ;;_ (prn :rh :fname fname :ftype ftype :offset offset :length length :fend fend :value value :reader reader :fields-cnt (+ 1 (count fields)))
             fend (if length (+ offset length) fend)
             msg-map (assoc msg-map fname value)]
         (recur fields fend msg-map)))))
@@ -59,8 +63,8 @@
   based on `(:spec ctx)` using writer functions in `(:writers ctx)`.
 
   ## Parameters:
-  - `buf`: is the js/Buffer to write into (if nil then allocates
-    js/Buffer of `DEFAULT-BUF-SIZE` bytes)
+  - `buf`: is the buffer to write into (if nil then allocates
+    a buffer of `DEFAULT-BUF-SIZE` bytes)
   - `msg-map`: map of field names -> field values to encode.
   - `start`: start writing at offset
   - `ctx`: a map of additional parsing context:
@@ -81,7 +85,7 @@
   [buf msg-map start {:keys [writers spec] :as ctx}]
   (loop [fields spec
          offset start]
-    (if (or (empty? fields) (>= offset (.-length buf)))
+    (if (or (empty? fields) (>= offset (plat/buf-len buf)))
       offset
       (let [[[fname ftype fctx] & fields] fields
             {:keys [length]} fctx
@@ -106,14 +110,14 @@
 
 (defn write-header-full
   "Like [[write-header]] but allocates a default sized buffer if not
-  provided and returns the encoded js/Buffer sliced to size of the
+  provided and returns the encoded buffer sliced to size of the
   actual written data."
   [buf msg-map start ctx]
-  (let [buf (cond (not buf)     (.alloc js/Buffer DEFAULT-BUF-SIZE)
-                  (number? buf) (.alloc js/Buffer buf)
+  (let [buf (cond (not buf)     (plat/buf-alloc DEFAULT-BUF-SIZE)
+                  (number? buf) (plat/buf-alloc buf)
                   :else         buf)
         end (write-header buf msg-map start ctx)]
-    (.slice buf 0 end)))
+    (plat/buf-slice buf 0 end)))
 
 (def ^{:doc "Header readers"}
   readers {:header read-header})

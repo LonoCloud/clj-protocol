@@ -1,5 +1,7 @@
 (ns protocol.addrs-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require #?(:cljs [cljs.test :refer-macros [deftest is]]
+               :clj  [clojure.test :refer [deftest is]])
+            [protocol.platform :as plat]
             [protocol.fields :as fields]
             [protocol.addrs :as addrs]))
 
@@ -44,7 +46,7 @@
 
 (deftest test-readers
   (println "  test-readers")
-  (let [buf (.from js/Buffer (clj->js [65 66 67 68 69 70 71 72 73 74]))]
+  (let [buf (plat/buf-from [65 66 67 68 69 70 71 72 73 74])]
     (doseq [[t v] {:ipv4      "67.68.69.70"
                    :mac       "43:44:45:46:47:48"}]
       (println "    reader" t)
@@ -59,8 +61,8 @@
           {:ipv4      ["67.68.69.70"       4 [0 0 67 68 69 70  0  0  0  0]]
            :mac       ["43:44:45:46:47:48" 6 [0 0 67 68 69 70 71 72  0  0]]}]
     (println "    writer" t v1 v2 v3)
-    (let [buf (.alloc js/Buffer 10)
+    (let [buf (plat/buf-alloc 10)
           sz ((fwriters t) buf v1 2 {:writers fwriters})
-          octs (vec (.slice buf 0))]
+          octs (plat/buf->vec buf 0)]
       (is (> sz 0))
       (is (= v3 octs)))))

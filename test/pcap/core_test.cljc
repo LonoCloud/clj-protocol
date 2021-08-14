@@ -1,8 +1,9 @@
 (ns pcap.core-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require #?(:cljs [cljs.test :refer-macros [deftest is]]
+               :clj  [clojure.test :refer [deftest is]])
             [pcap.core :as pcap]))
 
-(def EXAMPLE-PCAP-FILE "example.pcap")
+(def EXAMPLE-PCAP-FILE "test/example.pcap")
 
 (def FIRST-IP
   {:ver-ihl {:version 4

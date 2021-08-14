@@ -1,10 +1,9 @@
 (ns pcap.core
   "A example pcap file format reader"
-  (:require [protocol.addrs :as addrs]
+  (:require [protocol.platform :as plat]
+            [protocol.addrs :as addrs]
             [protocol.fields :as fields]
             [protocol.header :as header]))
-
-(def ^:private fs (js/require "fs"))
 
 ;; https://tools.ietf.org/id/draft-gharris-opsawg-pcap-00.html
 ;; https://github.com/pcapng/pcapng
@@ -80,8 +79,9 @@
 (def ^:private pcap-readers
   (merge fields/readers-LE header/readers))
 
-(defn- parse-file [path]
-  (let [buf (.readFileSync fs path)]
+(defn parse-file [path]
+  (let [buf (plat/buf-slurp path)]
+    ;;(println (util/pr-buf buf {:prefix "buf: "}))
     (header/read-header-full buf 0 {:readers pcap-readers :spec PCAP-HEADER})))
 
 (defn main

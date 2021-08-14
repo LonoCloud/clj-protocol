@@ -1,6 +1,7 @@
 (ns dhcp.core
   "DHCP protocol definition."
-  (:require [protocol.fields :as fields]
+  (:require [protocol.platform :as plat]
+            [protocol.fields :as fields]
             [protocol.addrs :as addrs]
             [protocol.tlvs :as tlvs]
             [protocol.header :as header]))
@@ -140,7 +141,7 @@
             :opt/end)))
 
 (defn write-dhcp
-  "Write/encode an DHCP payload into an allocated js/Buffer using
+  "Write/encode an DHCP payload into an allocated buffer using
   `msg-map`. Returns the allocated buffer sliced to the size written."
   [msg-map]
   ;; Move options down into :options keys
@@ -149,7 +150,7 @@
                             :when (contains? msg-map fname)]
                         [fname (get msg-map fname)]))
         msg-map (merge msg-map HEADERS-FIXED {:options options})
-        buf (.alloc js/Buffer MAX-BUF-SIZE)]
+        buf (plat/buf-alloc MAX-BUF-SIZE)]
     (header/write-header-full buf msg-map 0 {:writers writers
                                              :spec DHCP-HEADER})))
 

@@ -1,16 +1,12 @@
 (ns protocol.util
-  "Protocol print/debug utilities"
-  (:require [clojure.string :as string]))
-
-(defn pr-num
-  "Print a number `n` in base `base` with 0 padding up to size `sz`."
-  [n base sz]
-  (.padStart (.toString n base) sz "0"))
+  "Protocol platform specific, print, and debug utilities"
+  (:require [clojure.string :as string]
+            [protocol.platform :as plat]))
 
 (defn- chunk-buf [buf {:keys [columns start end base]
                       :or {columns 20 start 0 base 16}}]
-  (let [octets (map #(pr-num % base 2)
-                    (vec (.slice buf start (or end (.-length buf)))))]
+  (let [octets (map #(plat/pr-num % base 2)
+                    (plat/buf->vec buf start (or end (plat/buf-len buf))))]
     (map #(string/join " " %)
          (partition columns columns (repeat "  ") octets))))
 

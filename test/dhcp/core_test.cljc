@@ -1,12 +1,14 @@
 (ns dhcp.core-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require #?(:cljs [cljs.test :refer-macros [deftest is]]
+               :clj  [clojure.test :refer [deftest is]])
             [clojure.string :as string]
+            [protocol.platform :as plat]
             [protocol.util :as util]
             [dhcp.core :as dhcp]))
 
 (defn parse-raw-msg [s]
-  (.from js/Buffer (clj->js (for [oct (string/split s #"\s+")]
-			      (js/parseInt (str "0x" oct))))))
+  (plat/buf-from (for [oct (string/split s #"\s+")]
+                   (plat/string->num oct 16))))
 
 (def BASIC-MSG-STR
   (str
@@ -63,7 +65,7 @@
         buf (dhcp/write-dhcp msg)]
     (is (= BASIC-MSG-MAP msg))
     ;;(println (util/pr-bufs [BASIC-MSG-BUF buf] {:prefix "  "}))
-    (is (= 0 (.compare BASIC-MSG-BUF buf)))))
+    (is (= 0 (plat/buf-cmp BASIC-MSG-BUF buf)))))
 
 (deftest test-default-dhcp
   (println "  test-default-dhcp")

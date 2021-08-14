@@ -1,6 +1,8 @@
 (ns protocol.tlvs-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require #?(:cljs [cljs.test :refer-macros [deftest is]]
+               :clj  [clojure.test :refer [deftest is]])
             [clojure.string :as string]
+            [protocol.platform :as plat]
             [protocol.util :as util]
             [protocol.fields :as fields]
             [protocol.tlvs :as tlvs]))
@@ -28,8 +30,8 @@
 ;;;
 
 (defn parse-raw-msg [s]
-  (.from js/Buffer (clj->js (for [oct (string/split s #"\s+")]
-                              (js/parseInt (str "0x" oct))))))
+  (plat/buf-from (for [oct (string/split s #"\s+")]
+                   (plat/string->num oct 16))))
 
 (def TLV-TEST-1
   [:b 2])
@@ -109,24 +111,25 @@
 
 (deftest test-tlv-roundtrip
   (println "  test-tlv-roundtrip")
-  (let [buf (.alloc js/Buffer 1500)
+  (let [buf (plat/buf-alloc 1500)
         wend ((writers :tlv) buf TLV-TEST-1 2 TLVS-CTX)
-        rbuf (.slice buf 0 wend)
+        rbuf (plat/buf-slice buf 0 wend)
+        ;;_ (println (util/pr-bufs [TLV-TEST-1-BUF rbuf] {:prefix "  "}))
         [rend rmsg] ((readers :tlv) rbuf 2 TLVS-CTX)]
-    ;;(println (util/pr-bufs [TLV-TEST-1-BUF rbuf] {:prefix "  "}))
     (is (= wend rend))
-    (is (= 0 (.compare TLV-TEST-1-BUF rbuf)))
+    (is (= 0 (plat/buf-cmp TLV-TEST-1-BUF rbuf)))
     (is (= TLV-TEST-1 rmsg))))
 
 (deftest test-tlvs-roundtrip
   (println "  test-tlvs-roundtrip")
-  (let [buf (.alloc js/Buffer 1500)
+  (let [buf (plat/buf-alloc 1500)
         wend ((writers :tlv-seq) buf TLVS-TEST-2 2 TLVS-CTX)
-        rbuf (.slice buf 0 wend)
+        _ (println (util/pr-bufs [TLVS-TEST-2-BUF buf] {:prefix "    "}))
+        rbuf (plat/buf-slice buf 0 wend)
+        _ (println (util/pr-bufs [TLVS-TEST-2-BUF rbuf] {:prefix "    "}))
         [rend rmsg] ((readers :tlv-seq) rbuf 2 TLVS-CTX)]
-    ;;(println (util/pr-bufs [TLVS-TEST-2-BUF rbuf] {:prefix "  "}))
-    (is (= (.-length TLVS-TEST-2-BUF) wend rend))
-    (is (= 0 (.compare TLVS-TEST-2-BUF rbuf)))
+    (is (= (plat/buf-len TLVS-TEST-2-BUF) wend rend))
+    (is (= 0 (plat/buf-cmp TLVS-TEST-2-BUF rbuf)))
     (is (= TLVS-TEST-2 rmsg))))
 
 (deftest test-tlvs-stop

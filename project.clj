@@ -1,5 +1,5 @@
-;; This is just for generating codox docs
-;; Use shadow-cljs for building
+;; This is for running in Clojure and for generating codox docs
+;; Use shadow-cljs for building/running in ClojureScript
 
 (defproject clj-protocol "1.0.0"
   :description "Declarative Protocols and Binary Formats in ClojureScript"

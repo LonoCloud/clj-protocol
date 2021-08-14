@@ -7,7 +7,8 @@
 
   Writer functions take `[buf value-or-values start ctx]` and return
   `end` where `end` is the offset in `buf` after the written
-  value(s).")
+  value(s)."
+  (:require [protocol.platform :as plat]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Field and buffer manipulation functions
@@ -29,48 +30,10 @@
 (defn int->hex
   "Convert integer `i` into hex string representation"
   [i]
-  (let [h (js/Number.prototype.toString.call i 16)]
-    (if (= 1 (.-length h)) (str "0" h) h)))
+  (let [h (plat/num->string i 16)]
+    (if (= 1 (count h)) (str "0" h) h)))
 
 ;;;
-
-(defn bytes->bits
-  "Convert a sequence of bytes/octets `byts` (in MSB first order) into
-  a sequence of 0/1 'bits' (in MSB first order)"
-  [byts]
-  (mapcat #(map js/parseInt
-                (take-last 8 (seq (str "00000000" (.toString % 2)))))
-          byts))
-
-(defn bits->bytes
-  "Convert a sequence of 0/1 'bits' (in MSB first order) into
-  a sequence of bytes (in MSB first order)"
-  [bits]
-  (map #(js/parseInt (apply str %) 2)
-       (partition 8 bits)))
-
-(defn arr-fill
-  "Write/fill an sequence of octets/bytes from `arr` into the buffer
-  `dbuf` starting at `off`. If `cnt` is specified then only the first
-  `cnt` octets are written"
-  [dbuf arr off & [cnt]]
-  (let [tend (+ off (or cnt (count arr)))]
-    (.fill dbuf (.from js/Buffer (clj->js arr)) off tend)
-    tend))
-
-(defn buf-fill
-  "Copy/fill all bytes from `sbuf` into `dbuf` starting at offset
-  `off` within `dbuf`"
-  [dbuf sbuf off]
-  (let [tend (+ off (.-length sbuf))]
-    (.fill dbuf sbuf off tend)
-    tend))
-
-(defn buf->vec
-  "Slice buffer `buf` starting at `off` and ending at `end` and return
-  a vector of the octets/bytes"
-  [buf off end]
-  (-> (.slice buf off end) (.toJSON) (.-data) vec))
 
 (defn list->lookup
   "Takes columnar collection and one or more [k-idx v-idx] pairs and
@@ -143,7 +106,7 @@
   [buf start {:keys [readers loop-type length] :as ctx}]
   ;;(prn :read-loop0 :loop-type loop-type :start start :length length)
   (assert loop-type "No loop-type specified")
-  (let [end (if length (+ start length) (.-length buf))
+  (let [end (if length (+ start length) (plat/buf-len buf))
         reader (get readers loop-type)]
     (assert reader (str "No loop reader for " loop-type))
     (loop [offset start
@@ -230,14 +193,14 @@
   (assert length "Bitfield length not specified")
   (assert spec "Bitfield spec not specified")
   (let [end (+ start length)
-        byts (buf->vec buf start end)
+        byts (plat/buf->vec buf start end)
         byts (if le? (reverse byts) byts)
-        bits (bytes->bits byts)]
+        bits (plat/bytes->bits byts)]
     [end
      (first
        (reduce (fn [[res bs] [nam typ len]]
                  ;;(prn :res res :bs bs :name nam :typ typ :len len)
-                 (let [i (js/parseInt (apply str (take len bs)) 2)]
+                 (let [i (plat/string->num (apply str (take len bs)) 2)]
                    [(assoc res nam (condp = typ :int i :bool (> i 0)))
                     (drop len bs)]))
                [{} bits] spec))]))
@@ -254,16 +217,16 @@
   to encode for that bitfield."
   [buf bf-map start {:keys [spec le?] :as ctx}]
   (assert spec "Bitfield spec not specified")
-  (let [byts (bits->bytes
+  (let [byts (plat/bits->bytes
                (reduce (fn [res [nam typ len]]
                          (let [i (let [i (get bf-map nam 0)]
                                    (get {true 1 false 0} i i))
                                bs (take-last len (concat (repeat len "0")
-                                                         (.toString i 2)))]
+                                                         (plat/num->string i 2)))]
                            (into res bs)))
                        [] spec))
         byts (if le? (reverse byts) byts)]
-    (arr-fill buf byts start)))
+    (plat/arr-fill buf byts start)))
 
 (defn- write-bitfield-BE [b v s c] (write-bitfield b v s (assoc c :le? false)))
 (defn- write-bitfield-LE [b v s c] (write-bitfield b v s (assoc c :le? true)))
@@ -271,18 +234,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Readers and writers
 
-(def ^:private remove-null-re (js/RegExp. "\u0000" "g"))
-
-(set! *warn-on-infer* false)
-
 ;; Called with [buf start ctx]
 ;; Returns [offset value]
 (def ^:private readers-base
-  {:buf       #(let [e (+ %2 (:length %3)) v (.slice %1 %2 e)] [e v])
-   :raw       #(let [e (+ %2 (:length %3)) v (buf->vec %1 %2 e)] [e v])
-   :utf8      #(let [e (+ %2 (:length %3)) v (.toString %1 "utf8" %2 e)]
-                 [e (.replace v remove-null-re "")])
-   :uint8     #(vector (+ %2 1) (.readUInt8 %1 %2))
+  {:buf       #(let [e (+ %2 (or (:length %3) 0)) v (plat/buf-slice %1 %2 e)] [e v])
+   :raw       #(let [e (+ %2 (or (:length %3) 0)) v (plat/buf->vec %1 %2 e)] [e v])
+   :utf8      #(let [[e v] (plat/buf-read-utf8 %1 %2 (or (:length %3) 0))]
+                 [e (plat/remove-nulls v)])
+   :uint8     (fn [b s c] (plat/buf-read-uint8 b s))
    :lookup    read-lookup
    :repeat    read-repeat
    :loop      read-loop
@@ -290,30 +249,28 @@
 
 (def ^{:doc "Field readers (big endian)"}
   readers-BE
-  (merge
-    readers-base
-    {:uint16    #(vector (+ %2 2) (.readUInt16BE %1 %2))
-     :uint32    #(vector (+ %2 4) (.readUInt32BE %1 %2))
-     :uint64    #(vector (+ %2 8) (.readBigUInt64BE %1 %2))
-     :bitfield  read-bitfield-BE}))
+  (merge readers-base
+         {:uint16    (fn [b s c] (plat/buf-read-uint16-be b s))
+          :uint32    (fn [b s c] (plat/buf-read-uint32-be b s))
+          :uint64    (fn [b s c] (plat/buf-read-uint64-be b s))
+          :bitfield  read-bitfield-BE}))
 
 (def ^{:doc "Field readers (little endian)"}
   readers-LE
-  (merge
-    readers-base
-    {:uint16    #(vector (+ %2 2) (.readUInt16LE %1 %2))
-     :uint32    #(vector (+ %2 4) (.readUInt32LE %1 %2))
-     :uint64    #(vector (+ %2 8) (.readBigUInt64LE %1 %2))
-     :bitfield  read-bitfield-LE}))
+  (merge readers-base
+         {:uint16    (fn [b s c] (plat/buf-read-uint16-le b s))
+          :uint32    (fn [b s c] (plat/buf-read-uint32-le b s))
+          :uint64    (fn [b s c] (plat/buf-read-uint64-le b s))
+          :bitfield  read-bitfield-LE}))
 
 ;; Called with [buf value start ctx]
 ;; Returns offset/end after written value
 (def ^:private writers-base
-  {:buf       #(buf-fill %1 %2 %3)
-   :raw       #(arr-fill %1 %2 %3)
-   :utf8      #(let [l (or (:length %4) (.-length %2))]
-                 (do (.write %1 %2 %3 l "utf8") (+ l %3)))
-   :uint8     #(.writeUInt8 %1 %2 %3)
+  {:buf       (fn [b v s c] (plat/buf-fill b v s))
+   :raw       (fn [b v s c] (plat/arr-fill b v s))
+   :utf8      #(let [l (or (:length %4) (count %2))]
+                 (do (plat/buf-write-utf8 %1 %2 %3 l) (+ l %3)))
+   :uint8     (fn [b v s c] (plat/buf-write-uint8 b v s))
    :lookup    write-lookup
    :repeat    write-repeat
    :loop      write-loop
@@ -321,18 +278,16 @@
 
 (def ^{:doc "Field writers (big endian)"}
   writers-BE
-  (merge
-    writers-base
-    {:uint16    #(.writeUInt16BE %1 %2 %3)
-     :uint32    #(.writeUInt32BE %1 %2 %3)
-     :uint64    #(.writeBigUInt64BE %1 %2 %3)
-     :bitfield  write-bitfield-BE}))
+  (merge writers-base
+         {:uint16    (fn [b v s c] (plat/buf-write-uint16-be b v s))
+          :uint32    (fn [b v s c] (plat/buf-write-uint32-be b v s))
+          :uint64    (fn [b v s c] (plat/buf-write-uint64-be b v s))
+          :bitfield  write-bitfield-BE}))
 
 (def ^{:doc "Field writers (little endian)"}
   writers-LE
-  (merge
-    writers-base
-    {:uint16    #(.writeUInt16LE %1 %2 %3)
-     :uint32    #(.writeUInt32LE %1 %2 %3)
-     :uint64    #(.writeBigUInt64LE %1 %2 %3)
-     :bitfield  write-bitfield-LE}))
+  (merge writers-base
+         {:uint16    (fn [b v s c] (plat/buf-write-uint16-le b v s))
+          :uint32    (fn [b v s c] (plat/buf-write-uint32-le b v s))
+          :uint64    (fn [b v s c] (plat/buf-write-uint64-le b v s))
+          :bitfield  write-bitfield-LE}))

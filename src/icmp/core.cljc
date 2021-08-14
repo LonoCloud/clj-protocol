@@ -1,5 +1,6 @@
 (ns icmp.core
-  (:require [protocol.fields :as fields]
+  (:require [protocol.platform :as plat]
+            [protocol.fields :as fields]
             [protocol.addrs :as addrs]
             [protocol.header :as header]))
 
@@ -59,10 +60,10 @@
                                   :spec ICMP-HEADER}))
 
 (defn write-icmp
-  "Write/encode an ICMP payload into an allocated js/Buffer using
+  "Write/encode an ICMP payload into an allocated buffer using
   `msg-map`. Returns the allocated buffer sliced to the size written."
   [msg-map]
-  (let [buf (.alloc js/Buffer MAX-BUF-SIZE)]
+  (let [buf (plat/buf-alloc MAX-BUF-SIZE)]
     (header/write-header-full buf msg-map 0 {:writers writers
                                              :spec ICMP-HEADER})))
 

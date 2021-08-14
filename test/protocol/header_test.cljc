@@ -1,14 +1,16 @@
 (ns protocol.header-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require #?(:cljs [cljs.test :refer-macros [deftest is]]
+               :clj  [clojure.test :refer [deftest is]])
             [clojure.string :as string]
+            [protocol.platform :as plat]
             [protocol.fields :as fields]
             [protocol.tlvs :as tlvs]
             [protocol.header :as header]
             [protocol.util :as util]))
 
 (defn parse-raw-msg [s]
-  (.from js/Buffer (clj->js (for [oct (string/split s #"\s+")]
-                              (js/parseInt (str "0x" oct))))))
+  (plat/buf-from (for [oct (string/split s #"\s+")]
+                   (plat/string->num oct 16))))
 
 (def MSG-TYPE-LIST [[1 :MSG1] [2 :MSG2]])
 (def MSG-TYPE-LOOKUP (fields/list->lookup MSG-TYPE-LIST [0 1] [1 0]))
@@ -145,12 +147,12 @@
     ;;(println (util/pr-buf msg-buf3       {:prefix "      msg-buf3: "}))
     ;;(println "TEST-MSG-2-BUF | msg-buf2:")
     ;;(println (util/pr-bufs [TEST-MSG-2-BUF msg-buf2] {:prefix "  "}))
-    (is (> (.-length msg-buf1) 0))
-    (is (> (.-length msg-buf2) 0))
-    (is (> (.-length msg-buf3) 0))
-    (is (= 0 (.compare TEST-MSG-1-BUF msg-buf1)))
-    (is (= 0 (.compare TEST-MSG-2-BUF msg-buf2)))
-    (is (= 0 (.compare TEST-MSG-3-BUF msg-buf3)))))
+    (is (> (plat/buf-len msg-buf1) 0))
+    (is (> (plat/buf-len msg-buf2) 0))
+    (is (> (plat/buf-len msg-buf3) 0))
+    (is (= 0 (plat/buf-cmp TEST-MSG-1-BUF msg-buf1)))
+    (is (= 0 (plat/buf-cmp TEST-MSG-2-BUF msg-buf2)))
+    (is (= 0 (plat/buf-cmp TEST-MSG-3-BUF msg-buf3)))))
 
 (deftest test-header-roundtrip
   (println "  test-header-roundtrip")

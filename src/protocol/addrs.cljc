@@ -6,22 +6,24 @@
 
   Writer functions take `[buf value-or-values start ctx]` and return
   `end` where `end` is the offset in `buf` after the written value(s)."
-  (:require [protocol.fields :as fields]))
+  (:require [clojure.string :as string]
+            [protocol.platform :as plat]
+            [protocol.fields :as fields]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Network Address support functions
 
 (defn ip->octet "Convert IPv4 string to bytes/octets" [ip]
-  (map int (.split ip ".")))
+  (map plat/string->num (string/split ip #"[.]")))
 
 (defn octet->ip "convert bytes/octets to IPv4 string" [os]
-  (.join (clj->js os) "."))
+  (string/join "." os))
 
 (defn mac->octet "Convert MAC addr string to bytes/octets" [mac]
-  (map #(js/parseInt %1 16) (.split mac ":")))
+  (map #(plat/string->num %1 16) (string/split mac #":")))
 
 (defn octet->mac "Convert bytes/octets to MAC addr string" [os]
-  (.join (clj->js (map fields/int->hex os)) ":"))
+  (string/join ":" (map fields/int->hex os)))
 
 (defn ip->int "Convert IPv4 string to uint32 value" [ip]
   (fields/octet->int (ip->octet ip)))
@@ -46,8 +48,8 @@
 (defn mask-int->prefix
   "Convert network mask as uint32 IPv4 value to CIDR prefix value"
   [mask-int]
-  (let [bin (.toString mask-int 2)]
-    (count (filter #(= "1" %) (.split bin "")))))
+  (let [bin (plat/num->string mask-int 2)]
+    (count (filter #(= "1" %) (string/split bin #"")))))
 
 (defn mask-ip->prefix
   "Convert network mask as IP string to CIDR prefix value"
@@ -74,10 +76,10 @@
 
 (def ^{:doc "Network address (IPv4 and MAC) readers"}
   readers
-  {:ipv4 #(let [e (+ 4 %2)] [e (octet->ip (fields/buf->vec %1 %2 e))])
-   :mac  #(let [e (+ 6 %2)] [e (octet->mac (fields/buf->vec %1 %2 (+ 6 %2)))])})
+  {:ipv4 (fn [b o & as] (let [e (+ 4 o)] [e (octet->ip (plat/buf->vec b o e))]))
+   :mac  (fn [b o & as] (let [e (+ 6 o)] [e (octet->mac (plat/buf->vec b o e))]))})
 
 (def ^{:doc "Network address (IPv4 and MAC) writers"}
   writers
-  {:ipv4 #(fields/arr-fill %1 (ip->octet %2) %3 4)
-   :mac  #(fields/arr-fill %1 (mac->octet %2) %3 6)})
+  {:ipv4 (fn [b v o & as] (plat/arr-fill b (ip->octet v) o 4))
+   :mac  (fn [b v o & as] (plat/arr-fill b (mac->octet v) o 6))})

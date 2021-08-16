@@ -2,11 +2,11 @@
   "A simple DHCP client."
   (:require [protocol.socket :as socket]
             [dhcp.core :as dhcp]
-            [dhcp.util :as util]))
+            [dhcp.util :as util]
+            ["minimist" :as minimist]
+            ["dgram" :as dgram]
+            ["pcap" :as pcap]))
 
-(def ^:private minimist (js/require "minimist"))
-(def ^:private dgram (js/require "dgram"))
-(def ^:private pcap (js/require "pcap"))
 
 (defn client-message-handler
   "Respond to DHCP messages. Read the DHCP message from `buf`, and
@@ -63,7 +63,7 @@
   [{:keys [hw-addr if-name] :as cfg}]
   (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
                          " and not ether src " hw-addr)
-        psession (.createSession pcap if-name #js {:filter pcap-filter})]
+        psession (pcap/createSession if-name #js {:filter pcap-filter})]
     (println (str "Listening via pcap (filter: '" pcap-filter "')"))
     (doto psession
       (.on "packet" (fn [pkt]
@@ -100,7 +100,7 @@
         {:keys [verbose if-name server-ip unicast]} opts
 
         hw-addr (util/get-mac-address if-name)
-        sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
+        sock (dgram/createSocket #js {:type "udp4" :reuseAddr true})
         cfg {:if-name if-name
              :hw-addr hw-addr
              :server-ip server-ip

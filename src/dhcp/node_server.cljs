@@ -2,9 +2,8 @@
   "Framework for creating DHCP server implementations. Actual "
   (:require [clojure.string :as string]
             [protocol.socket :as socket]
-            [dhcp.core :as dhcp]))
-
-(def dgram (js/require "dgram"))
+            [dhcp.core :as dhcp]
+            ["dgram" :as dgram]))
 
 (defn server-message-handler
   "Read/decode DHCP messages from a client, call `message-handler` to
@@ -31,7 +30,7 @@
   "Create a DHCP server listening on `if-name` that will call
   `message-handler` to get a response message for a client message."
   [{:keys [if-name buffsz message-handler] :as cfg}]
-  (let [sock (.createSocket dgram #js {:type "udp4" :reuseAddr true})
+  (let [sock (dgram/createSocket #js {:type "udp4" :reuseAddr true})
         cfg (assoc cfg :sock sock)]
     (doto sock
       (.on "error" (fn [& err] (prn :err err)))

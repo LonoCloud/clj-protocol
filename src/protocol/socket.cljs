@@ -1,8 +1,7 @@
 (ns protocol.socket
-  "Low-level functions for setting socket options")
-
-(def ^:private ffi (js/require "@saleae/ffi"))
-(def ^:private ref (js/require "ref"))
+  "Low-level functions for setting socket options"
+  (:require ["ref" :as ref]
+            ["@saleae/ffi" :as ffi]))
 
 (def ETH-HDR-LEN 14)
 ;; Assumes no IP options (ihl = 5)
@@ -52,9 +51,9 @@
          (into {} (map (fn [[o v]] [(get PROTOCOLS o) v]) OPTIONS*))))
 
 (def ^:private bindings
-  (.Library ffi nil
-            (clj->js {"getsockopt" ["int" ["int" "int" "int" "pointer" "pointer"]]
-                      "setsockopt" ["int" ["int" "int" "int" "string" "int"]]})))
+  (ffi/Library nil
+               (clj->js {"getsockopt" ["int" ["int" "int" "int" "pointer" "pointer"]]
+                         "setsockopt" ["int" ["int" "int" "int" "string" "int"]]})))
 
 (defn setsockopt
   "Set `level`/`option`/`value` socket options on `sock`"
@@ -62,12 +61,12 @@
   (let [fd (if (number? sock) sock ^number (.-_handle.fd sock))
         level-num (if (number? level) level (get PROTOCOLS level))
         option-num (if (number? option) option (get-in OPTIONS [level option]))
-        buf (if (string? value) value (.alloc ref (.-types.int ref) value))
-        sz (if (string? value) (.-length value) (.-types.int.size ref))
+        buf (if (string? value) value (ref/alloc ref/types.int value))
+        sz (if (string? value) (.-length value) ref/types.int.size)
         f-str  (str "setsockopt(" fd ", " level ", " option ", " value ", " sz ")")
         res (.setsockopt bindings fd level-num option-num buf sz)]
     (if (< res 0)
-      (throw (js/Error. (str "Could not " f-str ", Errno:" (.errno ffi))))
+      (throw (js/Error. (str "Could not " f-str ", Errno:" (ffi/errno))))
       (println "Called" f-str "sucessfully. Result:" res))))
 
 ;;;

@@ -2,7 +2,8 @@
   "Protocol platform specific functions"
   (:require [clojure.string :as string]
             #?(:clj [clojure.pprint :refer [cl-format]])
-            #?(:clj [clojure.java.io :as io]))
+            #?(:clj [clojure.java.io :as io])
+            #?(:cljs ["fs" :as fs]))
   #?(:clj
      (:import [java.math BigInteger]
               [java.nio ByteBuffer ByteOrder]
@@ -129,7 +130,6 @@
               (.get buf ba 0 len)
               (vec (map #(bit-and 0xff %) ba))))))
 
-#?(:cljs (def ^:private fs (js/require "fs")))
 (defn buf-slurp [path]
   #?(:cljs (.readFileSync fs path)
      :clj (with-open [is (io/input-stream path)

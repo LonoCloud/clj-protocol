@@ -1,5 +1,5 @@
 (ns protocol.util
-  "Protocol platform specific, print, and debug utilities"
+  "Protocol platform specific print and debug utilities"
   (:require [clojure.string :as string]
             [protocol.platform :as plat]))
 

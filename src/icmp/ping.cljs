@@ -2,9 +2,8 @@
   (:require [protocol.fields :as fields]
             [protocol.tlvs :as tlvs]
             [protocol.header :as header]
-            [icmp.core :as icmp]))
-
-(def ^:private raw (js/require "raw-socket"))
+            [icmp.core :as icmp]
+            ["raw-socket" :as raw]))
 
 (def ^:private last-seq-num (atom 0))
 
@@ -20,7 +19,7 @@
         buf (icmp/write-icmp ping-msg)]
     (println ">>>" targ-ip ping-msg)
     ;;(js/console.log "ping buf:" buf)
-    (.writeChecksum raw buf 2 (.createChecksum raw buf))
+    (raw/writeChecksum buf 2 (raw/createChecksum buf))
     (.send sock buf 0 (.-length buf) targ-ip
            (fn [err byts]
              (if err
@@ -31,7 +30,7 @@
   "Create a raw socket and start sending periodic pings to `targ-ip`
   and printing the responses."
   [targ-ip & args]
-  (let [sock (.createSocket raw #js {:protocol (.-Protocol.ICMP raw)})]
+  (let [sock (raw/createSocket #js {:protocol raw/Protocol.ICMP})]
     (doto sock
       (.on "message" (fn [buf srv]
                        ;; We get whole IP packet

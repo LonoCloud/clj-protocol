@@ -153,8 +153,9 @@ npx shadow-cljs compile test
 node build/test.js
 ```
 
-Use docker-compose and conlink to launch a self-contained network
-environment that runs the DHCP client, server, and ping client.
+Use docker-compose and [conlink](https://github.com/LonoCloud/conlink)
+to launch a self-contained network environment that runs the DHCP
+client, server, and ping client.
 
 ```
 cd test

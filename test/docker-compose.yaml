@@ -14,7 +14,7 @@ x-service-base: &service-base
 
 services:
   net:
-    image: lonocloud-docker.docker.artifactory.viasat.com/graphite-conlink:20210602_171804-geafd988b044f
+    image: lonocloud/conlink:20210825_165410-g9c367bc6fc24
     pid: host
     network_mode: none
     cap_add: [SYS_ADMIN, SYS_NICE, NET_ADMIN, NET_BROADCAST]

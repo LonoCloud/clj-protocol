@@ -3,6 +3,9 @@
 clj-protocol enables declarative definition of network protocols and
 binary formats.
 
+Full API Documentation (generated with codox) is available
+[here](https://lonocloud.github.io/clj-protocol/www/index.html).
+
 ## Quick Tutorial
 
 [//]: # (This should be kept in sync with docs/tutorial.md)

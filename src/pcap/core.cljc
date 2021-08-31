@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns pcap.core
   "A example pcap file format reader"
   (:require [protocol.platform :as plat]

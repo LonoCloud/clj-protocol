@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns dhcp.core-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest is]]
                :clj  [clojure.test :refer [deftest is]])

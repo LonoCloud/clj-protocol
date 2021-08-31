@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns protocol.socket
   "Low-level functions for setting socket options"
   (:require ["ref" :as ref]

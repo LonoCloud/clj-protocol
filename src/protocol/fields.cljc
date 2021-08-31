@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns protocol.fields
   "Read, write, and manipulate field data.
 

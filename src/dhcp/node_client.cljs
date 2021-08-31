@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns dhcp.node-client
   "A simple DHCP client."
   (:require [protocol.socket :as socket]

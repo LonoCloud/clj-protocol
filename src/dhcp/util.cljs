@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns dhcp.util
   "Interface and file I/O utility functions."
   (:require [clojure.string :as string]

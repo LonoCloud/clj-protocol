@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns dhcp.json-pool-server
   (:require [protocol.addrs :as addrs]
             [dhcp.core :as dhcp]

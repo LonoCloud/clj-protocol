@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns protocol.util
   "Protocol platform specific print and debug utilities"
   (:require [clojure.string :as string]

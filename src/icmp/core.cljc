@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns icmp.core
   (:require [protocol.platform :as plat]
             [protocol.fields :as fields]

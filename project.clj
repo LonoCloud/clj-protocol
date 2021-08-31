@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 ;; This is for running in Clojure and for generating codox docs
 ;; Use shadow-cljs for building/running in ClojureScript
 

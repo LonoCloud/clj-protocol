@@ -1,3 +1,6 @@
+;; Copyright (c) 2021, Viasat, Inc
+;; Licensed under EPL 2.0
+
 (ns dhcp.core
   "DHCP protocol definition."
   (:require [protocol.platform :as plat]

@@ -3,8 +3,8 @@
 
 (ns protocol.socket
   "Low-level functions for setting socket options"
-  (:require ["ref" :as ref]
-            ["@saleae/ffi" :as ffi]))
+  (:require ["ref-napi" :as ref]
+            ["ffi-napi" :as ffi]))
 
 (def ETH-HDR-LEN 14)
 ;; Assumes no IP options (ihl = 5)

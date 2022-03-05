@@ -7,7 +7,8 @@
     "shadow-cljs": "2.14.4"
   },
   "dependencies": {
-    "@saleae/ffi": "^3.0.2",
+    "ffi-napi": "^4.0.3",
+    "ref-napi": "^3.0.3",
     "fs-extra": "^3.0.1",
     "minimist": "^1.2.0",
     "pcap": "3.1.0",

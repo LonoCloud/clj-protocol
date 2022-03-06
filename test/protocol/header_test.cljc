@@ -110,6 +110,41 @@
                      :data-b {:hops [:tlv/hops 17]}
                      :data-c {:host "abcdef"}})
 
+;;;
+
+(def HEADER-4-PACKET
+  ;;name,       type,      extra-context
+  [[:field2    :uint8     {:default 0}]
+   [:payload   :raw       {:default 0}]])
+
+(def HEADER-4-RECORD
+  ;;name,       type,      extra-context
+  [[:pkt-len   :uint8     {:default 0}]
+   [:packet    :header    {:length :pkt-len
+                           :spec HEADER-4-PACKET}]])
+
+(def HEADER-4
+  ;;name,       type,      extra-context
+  [[:field1     :uint8     {:default 0}]
+   [:records    :loop      {:loop-type :header
+                            :spec HEADER-4-RECORD}]])
+
+(def TEST-MSG-4-STR
+  "71
+   04  72 02 03 04
+   05  73 05 06 07 08
+   02  74 09")
+(def TEST-MSG-4-BUF (parse-raw-msg TEST-MSG-4-STR))
+(def TEST-MSG-4-MAP {:field1 0x71
+                     :records [{:pkt-len 4
+                                :packet {:field2 0x72
+                                         :payload [0x02 0x03 0x04]}}
+                               {:pkt-len 5
+                                :packet {:field2 0x73
+                                         :payload [0x05 0x06 0x07 0x08]}}
+                               {:pkt-len 2
+                                :packet {:field2 0x74
+                                         :payload [0x09]}}]})
 ;;;;;;;;;;;;;;;;;
 
 
@@ -119,6 +154,7 @@
 (def TEST-CTX-1 {:readers readers :writers writers :spec HEADER-1})
 (def TEST-CTX-2 {:readers readers :writers writers :spec HEADER-2})
 (def TEST-CTX-3 {:readers readers :writers writers :spec HEADER-3})
+(def TEST-CTX-4 {:readers readers :writers writers :spec HEADER-4})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -130,10 +166,13 @@
         ;;_ (prn :msg-map2 msg-map2)
         [rend3 msg-map3] (header/read-header TEST-MSG-3-BUF 0 TEST-CTX-3)
         ;;_ (prn :msg-map3 msg-map3)
+        [rend4 msg-map4] (header/read-header TEST-MSG-4-BUF 0 TEST-CTX-4)
+        ;;_ (prn :msg-map4 msg-map4)
         ]
     (is (= TEST-MSG-1-MAP msg-map1))
     (is (= TEST-MSG-2-MAP msg-map2))
     (is (= TEST-MSG-3-MAP msg-map3))
+    (is (= TEST-MSG-4-MAP msg-map4))
     ))
 
 (deftest test-header-write
@@ -141,6 +180,7 @@
   (let [msg-buf1 (header/write-header-full nil TEST-MSG-1-MAP 0 TEST-CTX-1)
         msg-buf2 (header/write-header-full nil TEST-MSG-2-MAP 0 TEST-CTX-2)
         msg-buf3 (header/write-header-full nil TEST-MSG-3-MAP 0 TEST-CTX-3)
+        msg-buf4 (header/write-header-full nil TEST-MSG-4-MAP 0 TEST-CTX-4)
         ]
     ;;(println (util/pr-buf TEST-MSG-1-BUF {:prefix "TEST-MSG-1-BUF: "}))
     ;;(println (util/pr-buf msg-buf1       {:prefix "      msg-buf1: "}))
@@ -153,9 +193,11 @@
     (is (> (plat/buf-len msg-buf1) 0))
     (is (> (plat/buf-len msg-buf2) 0))
     (is (> (plat/buf-len msg-buf3) 0))
+    (is (> (plat/buf-len msg-buf4) 0))
     (is (= 0 (plat/buf-cmp TEST-MSG-1-BUF msg-buf1)))
     (is (= 0 (plat/buf-cmp TEST-MSG-2-BUF msg-buf2)))
-    (is (= 0 (plat/buf-cmp TEST-MSG-3-BUF msg-buf3)))))
+    (is (= 0 (plat/buf-cmp TEST-MSG-3-BUF msg-buf3)))
+    (is (= 0 (plat/buf-cmp TEST-MSG-4-BUF msg-buf4)))))
 
 (deftest test-header-roundtrip
   (println "  test-header-roundtrip")
@@ -164,8 +206,11 @@
         msg-buf2 (header/write-header-full nil TEST-MSG-2-MAP 0 TEST-CTX-2)
         msg-map2 (header/read-header-full msg-buf2 0 TEST-CTX-2)
         msg-buf3 (header/write-header-full nil TEST-MSG-3-MAP 0 TEST-CTX-3)
-        msg-map3 (header/read-header-full msg-buf3 0 TEST-CTX-3)]
+        msg-map3 (header/read-header-full msg-buf3 0 TEST-CTX-3)
+        msg-buf4 (header/write-header-full nil TEST-MSG-4-MAP 0 TEST-CTX-4)
+        msg-map4 (header/read-header-full msg-buf4 0 TEST-CTX-4)]
     (is (= TEST-MSG-1-MAP msg-map1))
     (is (= TEST-MSG-2-MAP msg-map2))
-    (is (= TEST-MSG-3-MAP msg-map3))))
+    (is (= TEST-MSG-3-MAP msg-map3))
+    (is (= TEST-MSG-4-MAP msg-map4))))
 

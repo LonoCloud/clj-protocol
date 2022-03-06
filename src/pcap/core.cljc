@@ -47,7 +47,8 @@
   [[:dst-mac    :mac       {:default ""}]
    [:src-mac    :mac       {:default ""}]
    [:ethertype  :uint16    {:default 0}]
-   [:payload    :choice    {:choice-path [:ethertype] :choices ETHERTYPE-MAP}]])
+   [:payload    :choice    {:choice-path [:ethertype] :choices ETHERTYPE-MAP}]
+   [:snap-pad   :raw       {:default 0}]])
 
 (def ^:private packet-readers
   (merge fields/readers-BE addrs/readers header/readers))

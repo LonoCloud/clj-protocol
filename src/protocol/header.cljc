@@ -32,34 +32,36 @@
          * `type`: type to lookup in readers map
          * `extra-ctx`: extra context merged into ctx before reading:
              * `default`: ignored for reading
-             * `length`: length of field and can be:
+             * `length`:
                  * number: the number of bytes from the start of field (offset)
-                 * `:*`: the rest of the buffer
                  * field: the name of a previously read field that contains
                    number of bytes from start of the field (offset)
+                 * `:*`: the rest of the buffer (TODO: remove?)
+                 * defaults to length of remaining bytes in current context
       * `msg-map`: map of values previously read"
-  [buf start {:keys [readers spec] :as ctx}]
+  [buf start {:keys [readers spec length] :as ctx}]
   (loop [fields spec
          offset start
+         length (or length (- (plat/buf-len buf) offset))
          msg-map {}]
     (if (or (empty? fields) (>= offset (plat/buf-len buf)))
       [offset msg-map]
       (let [[[fname ftype fctx] & fields] fields
-            length (:length fctx)
-            length (if (= :* length)
+            flength (:length fctx)
+            flength (if (= :* flength)
                      (- (plat/buf-len buf) offset)
-                     (or (get msg-map length) length))
-            ;;_ (prn :rh 0 :fname fname :ftype ftype :offset offset :length length)
+                     (or (get msg-map flength) flength length))
+            ;;_ (prn :rh 0 :fname fname :ftype ftype :offset offset :length length :flength flength)
             reader (readers ftype)
             _ (assert reader (str "No reader for " ftype))
-            ctx (merge (dissoc ctx :length)
+            ctx (merge ctx
                        fctx
-                       {:msg-map msg-map}
-                       (when length {:length length}))
+                       {:msg-map msg-map
+                        :length flength})
             [fend value] (reader buf offset ctx)
-            fend (if length (+ offset length) fend)
+            length (- length (- fend offset))
             msg-map (assoc msg-map fname value)]
-        (recur fields fend msg-map)))))
+        (recur fields fend length msg-map)))))
 
 (defn write-header
   "Writes/encodes data in `msg-map` into `buf` starting at `start`

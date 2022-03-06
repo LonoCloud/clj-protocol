@@ -57,22 +57,24 @@
 (defn read-lookup
   "Read `lookup-type` type from `buf` at `start` and lookup that key
   in `lookup` to get the value to return"
-  [buf start {:keys [readers lookup-type lookup] :as ctx}]
+  [buf start {:keys [readers path lookup-type lookup] :as ctx}]
   (let [reader (readers lookup-type)
-        _ (assert reader (str "Unknown lookup type " lookup-type))
+        _ (assert reader (str "Unknown lookup type " lookup-type " @" path))
+        ctx (assoc ctx :path ((fnil conj []) path [:lookup lookup-type]))
         [end k] (reader buf start ctx)
         v (get lookup k)]
-    (assert v (str "Key " k " not found in lookup"))
+    (assert v (str "Key " k " not found in lookup @" path))
     [end v]))
 
 (defn write-lookup
   "Lookup `k` in `lookup` and write it as a `lookup-type` type into
   `buf` at `start`"
-  [buf k start {:keys [writers lookup-type lookup] :as ctx}]
+  [buf k start {:keys [writers path lookup-type lookup] :as ctx}]
   (let [writer (writers lookup-type)
-        _ (assert writer (str "Unknown lookup type " lookup-type))
-        v (get lookup k)]
-    (assert v (str "Key " k " not found in lookup"))
+        _ (assert writer (str "Unknown lookup type " lookup-type " @" path))
+        v (get lookup k)
+        ctx (assoc ctx :path ((fnil conj []) path [:lookup lookup-type]))]
+    (assert v (str "Key " k " not found in lookup @" path))
     (writer buf v start ctx)))
 
 ;;;
@@ -80,22 +82,22 @@
 (defn read-repeat
   "Read a sequence of `repeat-type` elements from `buf` starting at
   `start`. The number of elements read is `length` / `repeat-size`"
-  [buf start {:keys [readers length repeat-type repeat-size] :as ctx}]
-  (assert repeat-type "No repeat-type specified")
-  (assert length "No length given for repeat")
+  [buf start {:keys [readers path length repeat-type repeat-size] :as ctx}]
+  (assert repeat-type ("No repeat-type specified @" path))
+  (assert length ("No length given for repeat @" path))
   (let [end (+ start length)
         reader (readers repeat-type)]
-    (assert reader (str "No reader found for " repeat-type))
+    (assert reader (str "No reader found for " repeat-type " @" path))
     [end (map #(second (reader buf % ctx))
               (range start end repeat-size))]))
 
 (defn write-repeat
   "Write a sequence of `repeat-type` elements (of size `repeat-size`)
   into `buf` starting at `start`"
-  [buf values start {:keys [writers repeat-type repeat-size] :as ctx}]
-  (assert repeat-type (str "No repeat-type specified"))
+  [buf values start {:keys [writers path repeat-type repeat-size] :as ctx}]
+  (assert repeat-type (str "No repeat-type specified @" path))
   (let [writer (writers repeat-type)]
-    (assert writer (str "No writer found for " repeat-type))
+    (assert writer (str "No writer found for " repeat-type " @" path))
     (last (map (fn [v o] (writer buf v o ctx))
                values
                (iterate #(+ % repeat-size) start)))))
@@ -106,18 +108,19 @@
   `start`. Elements will be read until either length is reached, the
   end of the buffer is reached, or the `loop-type` reader returns
   a three-tuple `[end value stop?]` with a truthy `stop?` value."
-  [buf start {:keys [readers loop-type length] :as ctx}]
+  [buf start {:keys [readers path loop-type length] :as ctx}]
   ;;(prn :read-loop0 :loop-type loop-type :start start :length length)
-  (assert loop-type "No loop-type specified")
+  (assert loop-type (str "No loop-type specified @" path))
   (let [end (if length (+ start length) (plat/buf-len buf))
         reader (get readers loop-type)]
-    (assert reader (str "No loop reader for " loop-type))
+    (assert reader (str "No loop reader for " loop-type " @" path))
     (loop [offset start
            res []]
       ;;(prn :read-loop1 :offset offset :end end :res res)
       (if (>= offset end)
         [offset res]
-        (let [ctx (assoc ctx :length (- end offset))
+        (let [ctx (merge ctx {:length (- end offset)
+                              :path ((fnil conj []) path [:loop loop-type])})
               [fend value stop?] (reader buf offset ctx)
               res (conj res value)]
           ;;(prn :read-loop2 :offset offset :end end :fend fend :value value)
@@ -128,16 +131,17 @@
 (defn write-loop
   "Write a sequence of `loop-type` elements into `buf` starting at
   `start`. All elements in `values` will be written to the buffer."
-  [buf values start {:keys [writers loop-type] :as ctx}]
+  [buf values start {:keys [writers path loop-type] :as ctx}]
   ;;(prn :write-loop loop-type :start start :values values)
-  (assert loop-type "No loop-type specified")
+  (assert loop-type (str "No loop-type specified @" path))
   (let [writer (get writers loop-type)]
-    (assert writer (str "No loop writer for " loop-type))
+    (assert writer (str "No loop writer for " loop-type " @" path))
     (loop [fend start
            values values]
       (if (not (seq values))
         fend
         (let [value (first values)
+              ctx (assoc ctx :path ((fnil conj []) path [:loop loop-type]))
               fend (writer buf value fend ctx)]
           (recur fend (next values)))))))
 
@@ -151,17 +155,20 @@
   must contain a `:choice-type` that specifies the selected reader.
   Any other entries in the choice context map are merged into the new
   context for that reader."
-  [buf start {:keys [msg-map readers choice-path choices] :as ctx}]
+  [buf start {:keys [msg-map readers path choice-path choices] :as ctx}]
   (let [choice-key (get-in msg-map choice-path)
         _ (assert choice-key
-                  (str "Switch path " choice-path " not in msg-map"))
+                  (str "Switch path " choice-path " not in msg-map @" path))
         choice (get choices choice-key)
         _ (assert choice
-                  (str "Switch value " choice-key " not in choices map"))
+                  (str "Switch value " choice-key " not in choices map @" path))
         {:keys [choice-type spec]} choice
-        reader (readers choice-type)]
-    (assert reader (str "No reader for " choice-type))
-    (reader buf start (merge ctx (dissoc choice choice-type)))))
+        reader (readers choice-type)
+        ctx (merge ctx
+                   (dissoc choice choice-type)
+                   {:path ((fnil conj []) path [:choice choice-key])})]
+    (assert reader (str "No reader for " choice-type " @" path))
+    (reader buf start ctx)))
 
 (defn write-choice
   "Write using a writer and context that is selected based on
@@ -171,17 +178,21 @@
   must contain a `:choice-type` that specifies the selected writer.
   Any other entries in the choice context map are merged into the new
   context for that writer."
-  [buf value start {:keys [msg-map writers choice-path choices] :as ctx}]
+  [buf value start {:keys [msg-map writers path choice-path choices] :as ctx}]
   (let [choice-key (get-in msg-map choice-path)
+        path ((fnil conj []) path [:choice choice-key])
         _ (assert choice-key
-                  (str "Switch path " choice-path " not in msg-map"))
+                  (str "Switch path " choice-path " not in msg-map @" path))
         choice (get choices choice-key)
         _ (assert choice
-                  (str "Switch value " choice-key " not in choices map"))
+                  (str "Switch value " choice-key " not in choices map @" path))
         {:keys [choice-type spec]} choice
-        writer (writers choice-type)]
-    (assert writer (str "No writer for " choice-type))
-    (writer buf value start (merge ctx (dissoc choice choice-type)))))
+        writer (writers choice-type)
+        ctx (merge ctx
+                   (dissoc choice choice-type)
+                   {:path path})]
+    (assert writer (str "No writer for " choice-type " @" path))
+    (writer buf value start ctx)))
 
 ;;;
 
@@ -192,9 +203,9 @@
   `name` is the bitfield key name, `type` can be either `:int` or `:bool` (for
   integer and boolean bitfield respectively), and `bits` is the number
   of bits to decode for that bitfield."
-  [buf start {:keys [length spec le?] :as ctx}]
-  (assert length "Bitfield length not specified")
-  (assert spec "Bitfield spec not specified")
+  [buf start {:keys [path length spec le?] :as ctx}]
+  (assert length (str "Bitfield length not specified @" path))
+  (assert spec (str "Bitfield spec not specified @" path))
   (let [end (+ start length)
         byts (plat/buf->vec buf start end)
         byts (if le? (reverse byts) byts)
@@ -218,8 +229,8 @@
   key in `bf-map`, `type` can be either `:int` or `:bool` (for integer
   and boolean bitfield respectively), and `bits` is the number of bits
   to encode for that bitfield."
-  [buf bf-map start {:keys [spec le?] :as ctx}]
-  (assert spec "Bitfield spec not specified")
+  [buf bf-map start {:keys [spec path le?] :as ctx}]
+  (assert spec (str "Bitfield spec not specified @" path))
   (let [byts (plat/bits->bytes
                (reduce (fn [res [nam typ len]]
                          (let [i (let [i (get bf-map nam 0)]

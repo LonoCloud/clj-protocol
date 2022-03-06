@@ -48,20 +48,22 @@
   the field. If the looked up type is `:tlv-stop` then a true value
   will be appended to the returned tuple to indicate to looping
   readers that there are no more TLVs to read."
-  [buf start {:keys [readers lookup tlv-tsize tlv-lsize] :as ctx}]
+  [buf start {:keys [readers path lookup tlv-tsize tlv-lsize] :as ctx}]
   (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
         [_ code] ((readers ctype) buf start ctx)
-        ttype (get-in lookup [:types code])
-        _ (assert ttype (str "No TLV lookup definition for code " code))
         tname (get-in lookup [:codes code])
+        path ((fnil conj []) path tname)
+        _ (assert tname
+                  (str "No TLV lookup definition for code " code " @" path))
+        ttype (get-in lookup [:types code])
         tctx (get-in lookup [:ctxs code])
         lstart (+ start tlv-tsize)]
     (if (= :tlv-stop ttype)
       [lstart [tname nil] true]
       (let [[_ len] ((readers ltype) buf (+ tlv-tsize start) ctx)
             vstart (+ lstart tlv-lsize)
-            ctx (merge ctx tctx {:length len})
+            ctx (merge ctx tctx {:length len :path path})
             [vend value] ((readers ttype) buf vstart ctx)]
         [vend [tname value]]))))
 
@@ -77,12 +79,14 @@
   If the type of the TLV is `:tlv-stop` then only the type part of the
   TLV will be written with the stop code (no length or value part will
   be written)."
-  [buf [tlv-name tlv-value] start {:keys [writers lookup
+  [buf [tlv-name tlv-value] start {:keys [writers path lookup
                                           tlv-tsize tlv-lsize] :as ctx}]
   (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
         code (get-in lookup [:names tlv-name])
-        _ (assert code (str "No TLV lookup definition for " tlv-name))
+        path ((fnil conj []) path tlv-name)
+        _ (assert code
+                  (str "No TLV lookup definition for " tlv-name " @" path))
         vtype (get-in lookup [:types tlv-name])
         vctx (get-in lookup [:ctxs tlv-name])
         vstart (+ start tlv-tsize tlv-lsize)
@@ -90,7 +94,7 @@
     (if (= :tlv-stop vtype)
       end
       (let [vwriter (writers vtype)
-            _ (assert vwriter (str "No writer for " vtype))
+            _ (assert vwriter (str "No writer for " vtype " @" path))
             end (vwriter         buf tlv-value      vstart              (merge ctx vctx))
             _   ((writers ltype) buf (- end vstart) (+ tlv-tsize start) ctx)]
         end))))

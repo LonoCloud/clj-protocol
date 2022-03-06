@@ -38,7 +38,7 @@
                    number of bytes from start of the field (offset)
                  * defaults to length of remaining bytes in current context
       * `msg-map`: map of values previously read"
-  [buf start {:keys [readers spec length] :as ctx}]
+  [buf start {:keys [readers spec path length] :as ctx}]
   (loop [fields spec
          offset start
          length (or length (- (plat/buf-len buf) offset))
@@ -51,11 +51,12 @@
                         (- (plat/buf-len buf) offset))
             ;;_ (prn :rh 0 :fname fname :ftype ftype :offset offset :length length :flength flength)
             reader (readers ftype)
-            _ (assert reader (str "No reader for " ftype))
+            _ (assert reader (str "No reader for " ftype " @" path))
             ctx (merge ctx
                        fctx
                        {:msg-map msg-map
-                        :length flength})
+                        :length flength
+                        :path ((fnil conj []) path fname)})
             [fend value] (reader buf offset ctx)
             length (- length (- fend offset))
             msg-map (assoc msg-map fname value)]
@@ -84,18 +85,19 @@
                   - field: the name of a field in msg-map that contains
                     number of bytes from start of the field (offset)
       - `msg-map`: parent msg-map for compound writers"
-  [buf msg-map start {:keys [writers spec] :as ctx}]
+  [buf msg-map start {:keys [writers spec path] :as ctx}]
   (loop [fields spec
          offset start]
     (if (or (empty? fields) (>= offset (plat/buf-len buf)))
       offset
       (let [[[fname ftype fctx] & fields] fields
+            path ((fnil conj []) path fname)
             {:keys [length]} fctx
             writer (writers ftype)
-            _ (assert writer (str "No writer for " ftype))
+            _ (assert writer (str "No writer for " ftype " @" path))
             value (get msg-map fname (get fctx :default))
-            ;;_ (prn :wh :start start :fname fname :ftype ftype :length length :value value)
-            ctx (merge ctx fctx {:msg-map msg-map})
+            ctx (merge ctx fctx {:msg-map msg-map :path path})
+            ;;_ (prn :wh 0 :path path :fname fname :ftype ftype :offset offset :length length :value value)
             ;; For fixed sized fields, ignore bytes written
             fend (writer buf value offset ctx)
             fend (if length

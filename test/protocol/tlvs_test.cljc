@@ -112,6 +112,13 @@
    :readers readers
    :writers writers})
 
+(deftest test-tlvs-read
+  (println "  test-tlvs-read")
+  (let [[rend rmsg2] ((readers :tlv-seq) TLVS-TEST-2-BUF 2 TLVS-CTX)
+        [rend rmsg3] ((readers :tlv-seq) TLVS-TEST-3-BUF 2 TLVS-CTX)]
+    (is (= TLVS-TEST-2 rmsg2))
+    (is (= TLVS-TEST-3 rmsg3))))
+
 (deftest test-tlv-roundtrip
   (println "  test-tlv-roundtrip")
   (let [buf (plat/buf-alloc 1500)

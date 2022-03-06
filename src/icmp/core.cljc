@@ -33,14 +33,14 @@
   ;; msg-type           name,          type,     extra-context
   {:echo-request      [[:id            :uint16   {:default 0}]
                        [:seq-num       :uint16   {:default 0}]
-                       [:payload       :raw      {:length :*}]]
+                       [:payload       :raw      {}]]
    :echo-reply        [[:id            :uint16   {:default 0}]
                        [:seq-num       :uint16   {:default 0}]
-                       [:payload       :raw      {:length :*}]]
+                       [:payload       :raw      {}]]
    :dest-unreachable  [[:unused        :uint32   {:default 0}]
-                       [:orig-packet   :raw      {:length :*}]]
+                       [:orig-packet   :raw      {}]]
    :redirect          [[:gw-addr       :ipv4     {:default ""}]
-                       [:orig-packet   :raw      {:length :*}]]})
+                       [:orig-packet   :raw      {}]]})
 (def MSG-TYPE-MAP
   (into {} (for [[k v] MSG-TYPE-HEADERS] [k {:choice-type :header :spec v}])))
 

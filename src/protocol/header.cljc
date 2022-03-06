@@ -36,7 +36,6 @@
                  * number: the number of bytes from the start of field (offset)
                  * field: the name of a previously read field that contains
                    number of bytes from start of the field (offset)
-                 * `:*`: the rest of the buffer (TODO: remove?)
                  * defaults to length of remaining bytes in current context
       * `msg-map`: map of values previously read"
   [buf start {:keys [readers spec length] :as ctx}]
@@ -48,9 +47,8 @@
       [offset msg-map]
       (let [[[fname ftype fctx] & fields] fields
             flength (:length fctx)
-            flength (if (= :* flength)
-                     (- (plat/buf-len buf) offset)
-                     (or (get msg-map flength) flength length))
+            flength (or (get msg-map flength) flength length
+                        (- (plat/buf-len buf) offset))
             ;;_ (prn :rh 0 :fname fname :ftype ftype :offset offset :length length :flength flength)
             reader (readers ftype)
             _ (assert reader (str "No reader for " ftype))
@@ -83,7 +81,6 @@
                  used instead
               - `length`:
                   - number: the number of bytes from the start of field (offset)
-                  - `:*`: the rest of the buffer
                   - field: the name of a field in msg-map that contains
                     number of bytes from start of the field (offset)
       - `msg-map`: parent msg-map for compound writers"
@@ -101,9 +98,9 @@
             ctx (merge ctx fctx {:msg-map msg-map})
             ;; For fixed sized fields, ignore bytes written
             fend (writer buf value offset ctx)
-            fend (cond (= :* length) fend
-                       length (+ offset (or (get msg-map length) length))
-                       :else fend)]
+            fend (if length
+                   (+ offset (or (get msg-map length) length))
+                   fend)]
         (recur fields fend)))))
 
 ;;;

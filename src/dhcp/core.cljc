@@ -57,7 +57,7 @@
     [[53  :opt/msg-type          :lookup       {:lookup-type :uint8
                                                 :lookup MSG-TYPE-LOOKUP}]
      [1   :opt/netmask           :ipv4         nil]
-     [3   :opt/router            :ipv4         nil]
+     [3   :opt/router            :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [4   :opt/time-servers      :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [6   :opt/dns-servers       :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [12  :opt/hostname          :utf8         nil]
@@ -174,7 +174,7 @@
        :opt/lease-time     (* 60 60 24) ;; default to 1 day
        :siaddr             (:address srv-if)
        :opt/netmask        (:netmask srv-if)
-       :opt/router         (:address srv-if)
+       :opt/router         [(:address srv-if)]
        :opt/dhcp-server-id (:address srv-if)
        :opt/broadcast      (:broadcast srv-if)
        :opt/dns-servers    [(:address srv-if)]}

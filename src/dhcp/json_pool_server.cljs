@@ -6,6 +6,7 @@
             [dhcp.core :as dhcp]
             [dhcp.util :as util]
             [dhcp.node-server :as server]
+            [clojure.edn :as edn]
             [clojure.walk :refer [postwalk]]))
 
 (def ^{:doc "In-memory cache of JSON pool. Format:
@@ -35,9 +36,9 @@
 (defn json-pool-init
   "Initialize the in-memory `pool` (see [[pool]] for format) either
   from a `leases-file` if it exists or with an empty pool using
-  `if-info` to specify the pool network ranges."
-  [{:keys [leases-file pool save-pool load-pool if-info] :as cfg}]
-  (let [{:keys [address netmask mac]} if-info]
+  `server-info` to specify the pool network ranges."
+  [{:keys [leases-file pool save-pool load-pool server-info] :as cfg}]
+  (let [{:keys [address netmask mac]} server-info]
     (if (util/existsSync leases-file)
       (do
         (println "Loading leases file:" leases-file)
@@ -58,8 +59,9 @@
   address from `pool` and responds to the client with that address. If
   the client MAC was already assigned an address then respond with
   the same address."
-  [{:keys [pool save-pool if-info] :as cfg} msg-map]
-  (let [chaddr (:chaddr msg-map)
+  [{:keys [pool save-pool server-info] :as cfg} msg-map]
+  (let [field-overrides (:fields cfg) ;; config file field/option overrides
+        chaddr (:chaddr msg-map)
         {:keys [ip-to-mac mac-to-ip ranges]} @pool
         cur-ip (get mac-to-ip chaddr)
         ip (or cur-ip (first-free ip-to-mac ranges))]
@@ -68,8 +70,11 @@
     (swap! pool #(-> %1 (assoc-in [:mac-to-ip %2] %3)
                      (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
     (save-pool cfg @pool)
-    (assoc (dhcp/default-response msg-map if-info)
-      :yiaddr ip)))
+    (merge
+      (dhcp/default-response msg-map server-info)
+      (select-keys msg-map [:giaddr :opt/relay-agent-info])
+      {:yiaddr ip}
+      field-overrides)))
 
 (defn log-message
   "Print a log message for the message in `msg-map`"
@@ -84,27 +89,30 @@
 (defn main
   "Start a JSON pool DHCP server listening on `if-name` and storing
   the JSON lease data in 'dhcp-leases.json'"
-  [if-name & args]
+  [if-name & [config-file args]]
+
   (when-not if-name
     (println "Must specify an interface name")
     (.exit js/process 0))
 
   (let [if-info (util/get-if-ipv4 if-name)
-        cfg {:message-handler pool-handler
-             :leases-file "dhcp-leases.json"
-             :log-msg log-message
-             :pool pool
-             :load-pool load-json-pool
-             :save-pool save-json-pool
-             :if-name if-name
-             :if-info if-info}]
+        file-cfg (when config-file
+                   (edn/read-string (util/slurp config-file)))
+        ;; Push server mac address down into :server-info if specified
+        file-cfg (if (:server-info file-cfg)
+                   (assoc-in file-cfg [:server-info :mac] (:mac if-info))
+                   file-cfg)
+        cfg (merge
+              {:leases-file "dhcp-leases.json"
+               :if-name if-name
+               :server-info if-info}
+              file-cfg
+              {:message-handler pool-handler
+               :log-msg log-message
+               :pool pool
+               :load-pool load-json-pool
+               :save-pool save-json-pool})]
 
     (json-pool-init cfg)
     (server/create-server cfg)))
-
-;; Only set main if we are being run
-;;(try
-;;  (when (re-seq #"realm_server" (.-id js/module))
-;;    (set! *main-cli-fn* -main))
-;;  (catch :default exc nil))
 

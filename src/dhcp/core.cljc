@@ -70,6 +70,7 @@
      [51  :opt/lease-time        :uint32       nil]
      [54  :opt/dhcp-server-id    :ipv4         nil]
      [55  :opt/parm-list         :raw          nil]
+     [57  :opt/max-msg-size      :uint16       nil]
      [58  :opt/renew-time        :uint32       nil]
      [59  :opt/rebind-time       :uint32       nil]
      [60  :opt/vendor-class-id   :raw          nil]

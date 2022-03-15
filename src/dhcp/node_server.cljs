@@ -15,14 +15,14 @@
   [{:keys [sock message-handler disable-bcast log-msg] :as cfg} buf rinfo]
   (let [msg-map (dhcp/read-dhcp buf)
         msg-type (:opt/msg-type msg-map)
-        _ (when log-msg
-            (log-msg cfg msg-map nil))
-        resp-msg-map (message-handler cfg msg-map)
-        buf (dhcp/write-dhcp resp-msg-map)
         resp-addr (if (and (not disable-bcast)
                            (dhcp/MSG-TYPE-BCAST-LOOKUP msg-type))
                     "255.255.255.255"
-                    (:address rinfo))]
+                    (:address rinfo))
+        _ (when log-msg
+            (log-msg cfg msg-map resp-addr))
+        resp-msg-map (message-handler cfg msg-map)
+        buf (dhcp/write-dhcp resp-msg-map)]
     (.send sock buf 0 (.-length buf) (:port rinfo) resp-addr
            #(if %1
               (println "Send failed:" %1)

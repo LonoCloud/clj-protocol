@@ -15,14 +15,14 @@ support Clojure (JVM).
 [//]: # (This should be kept in sync with docs/tutorial.md)
 
 Install dependencies and then start a REPL either using shadow-cljs or
-lumo:
+node babashka (nbb):
 
 ```
 cd clj-protocol
 npm install
 npx shadow-cljs node-repl
   # OR
-lumo -c src
+npx nbb -cp src
 ```
 
 If you are using Clojure (JVM) then you can use leiningen to start

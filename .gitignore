@@ -5,3 +5,5 @@ client.js
 server.js
 build
 target
+.lein-failures
+.lein-repl-history

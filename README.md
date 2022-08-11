@@ -6,6 +6,10 @@ binary formats.
 Full API Documentation (generated with codox) is available
 [here](https://lonocloud.github.io/clj-protocol/www/index.html).
 
+clj-protocol is primarily designed for use in ClojureScript (due to
+stronger host networking interfaces), however, the core libraries also
+support Clojure (JVM).
+
 ## Quick Tutorial
 
 [//]: # (This should be kept in sync with docs/tutorial.md)
@@ -21,17 +25,27 @@ npx shadow-cljs node-repl
 lumo -c src
 ```
 
+If you are using Clojure (JVM) then you can use leiningen to start
+a REPL:
+
+```
+cd clj-protocol
+lein repl
+```
+
 Require some clj-protocol namespaces:
 
 ```
+cljs.user=> (require '[protocol.platform :as platform])
 cljs.user=> (require '[protocol.fields :as fields])
 cljs.user=> (require '[protocol.header :as header])
 ```
 
-Define binary data in a Buffer that we will read/parse:
+Define binary data in a Buffer (or java.nio.ByteBuffer) that we will
+read/parse:
 
 ```
-cljs.user=> (def buf (.from js/Buffer #js [0x61 0x62 0x63 0x64]))
+user> (def buf (platform/buf-from [0x61 0x62 0x63 0x64]))
 ```
 
 Define a data format spec that specifies two 8-bit unsigned integers followed by
@@ -89,7 +103,7 @@ starting at offset 2:
 cljs.user=> (def msg {:f1 {:b1 5, :b2 false, :b3 16}})
 cljs.user=> (def buf2 (header/write-header-full
                         nil msg 2 {:spec spec3 :writers fields/writers-BE}))
-cljs.user=> (prn (vec buf2))
+cljs.user=> (prn (platform/buf->vec buf2 0))
 [0 0 10 0 0 16]
 ```
 
@@ -151,6 +165,12 @@ Build and run the tests:
 ```
 npx shadow-cljs compile test
 node build/test.js
+```
+
+If you are using Clojure (JVM) then run tests using leiningen:
+
+```
+lein test
 ```
 
 Use docker-compose and [conlink](https://github.com/LonoCloud/conlink)

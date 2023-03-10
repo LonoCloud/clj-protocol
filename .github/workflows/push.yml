@@ -23,8 +23,6 @@ jobs:
         with:
           lein: 'latest'               # Leiningen
           bb: 'latest'
-          cmd-exe-workaround: 'latest' # Replaces `clojure` with `deps.clj` on Windows
-          zprint: 1.2.3                # zprint
       - name: Cache Clojure dependencies
         uses: actions/cache@v3
         with:

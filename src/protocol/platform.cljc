@@ -179,7 +179,7 @@
 
 (defn buf-write-uint8 [buf v off]
   #?(:cljs (.writeUInt8 buf v off)
-     :clj  (do (.put buf off v) (+ off 1))))
+     :clj  (do (.put ^ByteBuffer buf (int off) (unchecked-byte v)) (+ off 1))))
 
 (defn buf-read-uint16-be [buf off]
   (vector (+ off 2)

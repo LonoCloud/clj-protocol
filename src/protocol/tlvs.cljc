@@ -49,7 +49,7 @@
   will be appended to the returned tuple to indicate to looping
   readers that there are no more TLVs to read."
   [buf start {:keys [readers path lookup tlv-tsize tlv-lsize] :as ctx}]
-  (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
+  (let [ctype (get {1 :uint8 2 :uint16 4 :uint32} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
         [_ code] ((readers ctype) buf start ctx)
         tname (get-in lookup [:codes code])
@@ -81,7 +81,7 @@
   be written)."
   [buf [tlv-name tlv-value] start {:keys [writers path lookup
                                           tlv-tsize tlv-lsize] :as ctx}]
-  (let [ctype (get {1 :uint8 2 :uint16} tlv-tsize)
+  (let [ctype (get {1 :uint8 2 :uint16 4 :uint32} tlv-tsize)
         ltype (get {1 :uint8 2 :uint16} tlv-lsize)
         code (get-in lookup [:names tlv-name])
         path ((fnil conj []) path tlv-name)

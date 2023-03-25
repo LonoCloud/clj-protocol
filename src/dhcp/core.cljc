@@ -136,10 +136,10 @@
 
 (defn read-dhcp
   "Read/decode a DHCP payload from `buf`"
-  [buf]
+  [buf & [spec]]
   ;; Merge options up into the top level map
   (let [msg-map (header/read-header-full buf 0 {:readers readers
-                                                :spec DHCP-HEADER})
+                                                :spec (or spec DHCP-HEADER)})
         options (:options msg-map)]
     (dissoc (merge msg-map options)
             :options
@@ -148,7 +148,7 @@
 (defn write-dhcp
   "Write/encode an DHCP payload into an allocated buffer using
   `msg-map`. Returns the allocated buffer sliced to the size written."
-  [msg-map]
+  [msg-map & [spec]]
   ;; Move options down into :options keys
   (let [options (into {:opt/end 0}
                       (for [fname (map second OPTS-LIST)
@@ -157,7 +157,7 @@
         msg-map (merge msg-map HEADERS-FIXED {:options options})
         buf (plat/buf-alloc MAX-BUF-SIZE)]
     (header/write-header-full buf msg-map 0 {:writers writers
-                                             :spec DHCP-HEADER})))
+                                             :spec (or spec DHCP-HEADER)})))
 
 
 (defn default-response

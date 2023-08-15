@@ -59,6 +59,7 @@
      [1   :opt/netmask           :ipv4         nil]
      [3   :opt/router            :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [4   :opt/time-servers      :repeat       {:repeat-type :ipv4 :repeat-size 4}]
+     [5   :opt/name-servers      :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [6   :opt/dns-servers       :repeat       {:repeat-type :ipv4 :repeat-size 4}]
      [12  :opt/hostname          :utf8         nil]
      [15  :opt/domainname        :utf8         nil]

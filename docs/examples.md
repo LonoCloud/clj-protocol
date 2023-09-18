@@ -1,16 +1,17 @@
 # Example programs
 
-The project includes four working examples:
+The project includes five working examples:
 
 * A DHCP client
 * A DHCP pool server
+* A DHCP mac2ip server
 * An ICMP/ping client
 * A pcap file parser
 
 Build the examples:
 
 ```
-npx shadow-cljs compile dhcp-client pool-server ping-client read-pcap
+npx shadow-cljs compile dhcp-client pool-server mac2ip-server ping-client read-pcap
 ```
 
 ## Usage:
@@ -30,6 +31,14 @@ npx shadow-cljs compile dhcp-client pool-server ping-client read-pcap
 
   ```
   sudo node ./build/pool-server.js eth0
+  ```
+
+* **DHCP mac2ip server** - Run a DHCP server on eth0 that calculates
+  the IP assignment based on the client's MAC address. The MAC to IP
+  mappings are defined in a config file.
+
+  ```
+  sudo node ./build/mac2ip-server.js --if-name eth0 --config-file mac2ip.json
   ```
 
 * **ICMP/ping client** - Use the ping client to demonstrate ICMP

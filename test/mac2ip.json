@@ -1,0 +1,11 @@
+{
+    "disable-broadcast": true,
+    "ranges": [
+        {
+            "ip-start":  "10.0.0.0",
+            "ip-end":    "11.0.0.0",
+            "mac-start": "00:00:10:00:00:00",
+            "mac-end":   "00:00:11:00:00:00"
+        }
+    ]
+}

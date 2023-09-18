@@ -112,10 +112,12 @@ cljs.user=> (prn (platform/buf->vec buf2 0))
 
 [//]: # (This should be kept in sync with docs/examples.md)
 
-The project includes four working examples:
+The project includes five working examples:
 
 * A DHCP client
 * A DHCP server that uses an IP lease pool
+* A DHCP server that uses direct MAC to IP mapping and that supports
+  multiprocess parallel workers
 * An ICMP/ping client
 * A pcap file parser
 
@@ -142,6 +144,14 @@ npx shadow-cljs compile dhcp-client dhcp-server ping-client read-pcap
 
   ```
   sudo node ./build/pool-server.js eth0
+  ```
+
+* **DHCP mac2ip server** - Run a DHCP server on eth0 that does direct
+  MAC to IP assignments (defined in the config file) and runs
+  5 parallel worker processes.
+
+  ```
+  sudo node ./build/mac2-ip-server.js -processes 5 --if-name eth0 --config-file mac2ip.json
   ```
 
 * **ICMP/ping client** - Use the ping client to demonstrate ICMP

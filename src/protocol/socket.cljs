@@ -97,6 +97,6 @@
   (setsockopt sock :SOL_SOCKET :SO_REUSEADDR 1))
 
 (defn set-freebind
-  "Enablet eh IPPROTO_IP/IP_FREEBIND socket option on `sock`"
+  "Enable the IPPROTO_IP/IP_FREEBIND socket option on `sock`"
   [sock] (setsockopt sock :IPPROTO_IP :IP_FREEBIND 1))
 

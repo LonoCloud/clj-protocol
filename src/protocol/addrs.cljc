@@ -34,6 +34,12 @@
 (defn int->ip "Convert IPv4 uint32 value to IPv4 string" [num]
   (octet->ip (fields/int->octet num 4)))
 
+(defn mac->int "Convert MAC string to int value" [ip]
+  (fields/octet->int (mac->octet ip)))
+
+(defn int->mac "Convert MAC int value to IPv4 string" [num]
+  (octet->mac (fields/int->octet num 6)))
+
 (defn first-ip
   "Return first IPv4 addr based on `ip` and `netmask`"
   [ip netmask]

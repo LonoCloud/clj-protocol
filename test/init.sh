@@ -21,6 +21,10 @@ wait_for_if eth0
 #echo "Starting tcpdump"
 #tcpdump -enli eth0 &
 
-echo "Running: ${@}"
+# Give servers a chance to fully start
+case "${*}" in
+  *client*) sleep 2 ;;
+esac
 
+echo "Running: ${@}"
 ${@}

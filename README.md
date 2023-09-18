@@ -164,6 +164,7 @@ Build and run the tests:
 
 ```
 npx shadow-cljs compile test
+chmod +x build/*.js
 node build/test.js
 ```
 

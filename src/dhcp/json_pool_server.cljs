@@ -5,6 +5,7 @@
   (:require [protocol.addrs :as addrs]
             [dhcp.core :as dhcp]
             [dhcp.util :as util]
+            [dhcp.logging :as logging]
             [dhcp.node-server :as server]
             [clojure.edn :as edn]
             [clojure.walk :refer [postwalk]]))
@@ -37,14 +38,14 @@
   "Initialize the in-memory `pool` (see [[pool]] for format) either
   from a `leases-file` if it exists or with an empty pool using
   `server-info` to specify the pool network ranges."
-  [{:keys [leases-file pool save-pool load-pool server-info] :as cfg}]
+  [{:keys [log-msg leases-file pool save-pool load-pool server-info] :as cfg}]
   (let [{:keys [address netmask mac]} server-info]
     (if (util/existsSync leases-file)
       (do
-        (println "Loading leases file:" leases-file)
+        (log-msg :info (str "Loading leases file: " leases-file))
         (reset! pool (load-pool cfg)))
       (let [[start-ip end-ip] (addrs/network-start-end address netmask true)]
-        (println "Creating new leases file:" leases-file)
+        (log-msg :info (str "Creating new leases file: " leases-file))
         (reset! pool {:ranges [{:start start-ip :end end-ip}]
                       :ip-to-mac {address mac}
                       :mac-to-ip {mac address}})
@@ -59,32 +60,24 @@
   address from `pool` and responds to the client with that address. If
   the client MAC was already assigned an address then respond with
   the same address."
-  [{:keys [pool save-pool server-info] :as cfg} msg-map]
+  [{:keys [log-msg pool save-pool server-info] :as cfg} msg-map]
   (let [field-overrides (:fields cfg) ;; config file field/option overrides
         chaddr (:chaddr msg-map)
         {:keys [ip-to-mac mac-to-ip ranges]} @pool
         cur-ip (get mac-to-ip chaddr)
         ip (or cur-ip (first-free ip-to-mac ranges))]
-    (assert ip "DHCP pool exhausted")
-    (println (str (and cur-ip "Re-") "Assigning") ip "to" chaddr)
-    (swap! pool #(-> %1 (assoc-in [:mac-to-ip %2] %3)
-                     (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
-    (save-pool cfg @pool)
-    (merge
-      (dhcp/default-response msg-map server-info)
-      (select-keys msg-map [:giaddr :opt/relay-agent-info])
-      {:yiaddr ip}
-      field-overrides)))
-
-(defn log-message
-  "Print a log message for the message in `msg-map`"
-  [cfg msg-map addr]
-  (let [msg-type (:opt/msg-type msg-map)
-        mac (:chaddr msg-map)]
-    (if (#{:DISCOVER :REQUEST} msg-type)
-      (println "Received" msg-type "for" mac "from" addr)
-      (println "Sent" msg-type "for"  mac "to" addr
-               "with yiaddr" (:yiaddr msg-map)))))
+    (if (not ip)
+      (log-msg :error "DHCP pool exhausted")
+      (do
+        (log-msg :info (str (if cur-ip "Re-") "Assigning " ip " to " chaddr))
+        (swap! pool #(-> %1 (assoc-in [:mac-to-ip %2] %3)
+                         (assoc-in [:ip-to-mac %3] %2)) chaddr ip)
+        (save-pool cfg @pool)
+        (merge
+          (dhcp/default-response msg-map server-info)
+          (select-keys msg-map [:giaddr :opt/relay-agent-info])
+          {:yiaddr ip}
+          field-overrides)))))
 
 (defn main
   "Start a JSON pool DHCP server listening on `if-name` and storing
@@ -92,27 +85,32 @@
   [if-name & [config-file args]]
 
   (when-not if-name
-    (println "Must specify an interface name")
-    (.exit js/process 0))
+    (util/fatal 2 "Must specify an interface name"))
 
   (let [if-info (util/get-if-ipv4 if-name)
         file-cfg (when config-file
                    (edn/read-string (util/slurp config-file)))
-        ;; Push server mac address down into :server-info if specified
-        file-cfg (if (:server-info file-cfg)
-                   (assoc-in file-cfg [:server-info :mac] (:mac if-info))
-                   file-cfg)
+        log-msg logging/log-message
+
+        ;; precedence: CLI opts, file config, discovered interface info
+        user-cfg (util/deep-merge {:leases-file "dhcp-leases.json"
+                                   :if-name if-name
+                                   :server-info if-info
+                                   :log-level 2}
+                                  file-cfg)
         cfg (merge
-              {:leases-file "dhcp-leases.json"
-               :if-name if-name
-               :server-info if-info}
-              file-cfg
+              user-cfg
               {:message-handler pool-handler
-               :log-msg log-message
+               :log-msg logging/log-message
                :pool pool
                :load-pool load-json-pool
                :save-pool save-json-pool})]
 
+    (logging/start-logging cfg)
+    (log-msg :info (str "User config: " user-cfg))
+
     (json-pool-init cfg)
+
+    (log-msg :info "Starting DHCP Server...")
     (server/create-server cfg)))
 

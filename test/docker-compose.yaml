@@ -52,14 +52,14 @@ services:
 
   svr:
     <<: *service-base
-    command: /root/app/init.sh /root/app/build/dhcp-server.js eth0
+    command: /root/app/init.sh /root/app/build/pool-server.js eth0
   cli:
     <<: *service-base
     scale: 3
-    command: /root/app/init.sh /root/app/build/dhcp-client.js eth0
+    command: /root/app/init.sh /root/app/build/dhcp-client.js --if-name eth0
   ucli:
     <<: *service-base
-    command: /root/app/init.sh /root/app/build/dhcp-client.js --unicast eth0
+    command: /root/app/init.sh /root/app/build/dhcp-client.js --unicast --if-name eth0
 
   icli:
     <<: *service-base

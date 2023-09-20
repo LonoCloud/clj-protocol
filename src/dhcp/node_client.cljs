@@ -6,10 +6,22 @@
   (:require [protocol.socket :as socket]
             [dhcp.core :as dhcp]
             [dhcp.util :as util]
-            ["minimist" :as minimist]
+            [dhcp.logging :as logging]
             ["dgram" :as dgram]
             ["pcap" :as pcap]))
 
+(def minimist (js/require "minimist"))
+
+(def USAGE "Usage: dhcp-client [options]
+Options:
+  --if-name|-i INTF  - Bind to INTF [default: eth0]
+  --server-ip|-s IP  - Send to IP [default: 255.255.255.255]
+  --unicast          - Listen for unicast responses instead of broadcast
+  --log-level LEVEL  - Set logging level to LEVEL [default: 2]
+                         0 - none
+                         1 - one character per event
+                         2 - full log line for each event
+")
 
 (defn client-message-handler
   "Respond to DHCP messages. Read the DHCP message from `buf`, and
@@ -18,32 +30,32 @@
   responding to a trigger (i.e. send DISCOVER) rather than to an
   actual received message."
   [cfg buf]
-  (let [{:keys [verbose sock if-name hw-addr server-ip state]} cfg
-        msg-map (when buf
-                  (dhcp/read-dhcp buf))
+  (let [{:keys [log-msg sock if-name hw-addr server-ip state]} cfg
+        msg-map (if buf
+                  (dhcp/read-dhcp buf)
+                  {:opt/msg-type :start :chaddr hw-addr :siaddr "SELF"})
         msg-type (:opt/msg-type msg-map)
         chaddr (:chaddr msg-map) ]
-    (if (and msg-map (not= hw-addr chaddr))
-      (when verbose
-        (println "Ignoring" msg-type "for"
-                 (if chaddr chaddr "") "(not us)"))
+    (if (and buf (not= hw-addr chaddr))
+      (log-msg :info "Ignoring" msg-type "for"
+               (if chaddr chaddr "") "(not us)")
       (let [;; _ (prn :msg-map msg-map)
             resp-defaults {:chaddr hw-addr}
             resp-msg-map (condp = msg-type
-                           nil    (merge resp-defaults
+                           :start (merge resp-defaults
                                          {:op 1 :opt/msg-type :DISCOVER})
                            :OFFER (merge resp-defaults
                                          {:op 1 :opt/msg-type :REQUEST})
                            :ACK   nil
-                           :NACK (println "Received NACK")
-                           (throw (println (str "Received invalid msg type"
-                                                msg-type))))]
+                           :NACK (log-msg :error "Received NACK")
+                           (log-msg :error (str "Received invalid msg type "
+                                                msg-type)))]
         (swap! state assoc :last-tx-ts (.getTime (js/Date.)))
-        (when msg-map
-          (println "Received" msg-type
-                   "message from" (:siaddr msg-map)))
+        (log-msg :recv msg-map (:siaddr msg-map))
         (if (= :ACK msg-type)
           (do
+            (log-msg :info (str "Setting " if-name " to " (:yiaddr msg-map)
+                                " (" (:opt/netmask msg-map) ")"))
             (util/set-ip-address if-name
                                  (:yiaddr msg-map)
                                  (:opt/netmask msg-map))
@@ -52,10 +64,9 @@
             (let [buf (dhcp/write-dhcp resp-msg-map)]
               (.send sock buf 0 (.-length buf) dhcp/RECV-PORT server-ip
                      #(if %1
-                        (println "Send failed:" %1)
-                        (println "Sent" (:opt/msg-type resp-msg-map)
-                                 "to" server-ip))))
-            (println "Got address:" (:yiaddr msg-map))))))))
+                        (log-msg :error (str "Send failed: " %1))
+                        (log-msg :send resp-msg-map server-ip))))
+            (log-msg :info (str "Got address: " (:yiaddr msg-map)))))))))
 
 (defn start-pcap-listener
   "Start a pcap listener socket so that we can receive broadcast
@@ -63,11 +74,11 @@
   assigned to that interface. We only listen for UDP packets that we
   didn't send (from `hw-addr`) and that are destined for
   [[dhcp/SEND-PORT]]"
-  [{:keys [hw-addr if-name] :as cfg}]
+  [{:keys [log-msg hw-addr if-name] :as cfg}]
   (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
                          " and not ether src " hw-addr)
         psession (pcap/createSession if-name #js {:filter pcap-filter})]
-    (println (str "Listening via pcap (filter: '" pcap-filter "')"))
+    (log-msg :info (str "Listening via pcap (filter: '" pcap-filter "')"))
     (doto psession
       (.on "packet" (fn [pkt]
                       (let [buf ^js/Buffer (.-buf pkt)
@@ -86,42 +97,53 @@
       ;; Trigger DISCOVER
       (client-message-handler cfg nil))))
 
-(defn main
-  "Start a DHCP client that will get an address assignment from a DHCP
-  server and update the specified interface address."
-  [& args]
-  (let [minimist-opts {:alias {:v :verbose
-                               :i :if-name
-                               :s :server-ip
-                               :u :unicast}
-                       :default {:verbose false
-                                 :if-name "eth0"
-                                 :server-ip "255.255.255.255"
-                                 :unicast false}}
-        opts (js->clj (minimist (apply array args) (clj->js minimist-opts))
-                      :keywordize-keys true)
-        {:keys [verbose if-name server-ip unicast]} opts
-
-        hw-addr (util/get-mac-address if-name)
+(defn create-client [{:keys [log-msg if-name server-ip unicast] :as cfg
+                      :or {log-msg #(apply println %&)}}]
+  (let [hw-addr (util/get-mac-address if-name)
         sock (dgram/createSocket #js {:type "udp4" :reuseAddr true})
-        cfg {:if-name if-name
-             :hw-addr hw-addr
-             :server-ip server-ip
-             :sock sock
-             :state (atom {:assigned? false
-                           :last-tx-ts 0})}]
-    (println (str "Binding to " if-name " (" hw-addr ")"))
+        hw-addr (util/get-mac-address if-name)
+        cfg (merge cfg
+                  {:sock sock
+                   :hw-addr hw-addr
+                   :state (atom {:assigned? false
+                                 :last-tx-ts 0})})]
+    (log-msg :info (str "Binding to " if-name " (" hw-addr ")"))
     ;; To listen before we have an address, we need pcap
     (doto sock
       (.on "listening" (fn []
-                         (println "Listening on port" dhcp/SEND-PORT)
+                         (log-msg :info (str "Listening on port "
+                                             dhcp/SEND-PORT))
                          (socket/bind-to-device sock if-name)
-                         #_(socket/freebind sock)
                          (.setBroadcast sock true)))
-      (.bind dhcp/SEND-PORT server-ip))
+      (.bind dhcp/SEND-PORT (when-not unicast "255.255.255.255")))
     (if unicast
       (doto sock
         (.on "message" (fn [msg rinfo]
                          (client-message-handler cfg msg))))
       (start-pcap-listener cfg))
-    (js/setInterval #(tick cfg) 1000)))
+    (js/setInterval #(tick cfg) 1000)
+    cfg))
+
+(defn main
+  "Start a DHCP client that will get an address assignment from a DHCP
+  server and update the specified interface address."
+  [& args]
+  (let [minimist-opts {:alias {:i :if-name
+                               :s :server-ip
+                               :u :unicast}
+                       :default {:if-name "eth0"
+                                 :server-ip "255.255.255.255"
+                                 :unicast false
+                                 :log-level 2}}
+        opts (js->clj (minimist (apply array args) (clj->js minimist-opts))
+                      :keywordize-keys true)
+        {:keys [h help if-name server-ip unicast]} opts
+        _ (when (or h help) (util/fatal 2 USAGE))
+        log-msg logging/log-message
+        cfg (assoc (dissoc opts :_) :log-msg log-msg)]
+
+    (logging/start-logging cfg)
+    (log-msg :info (str "User config: " cfg))
+
+    (log-msg :info "Starting DHCP Client...")
+    (create-client cfg)))

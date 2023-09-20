@@ -133,7 +133,7 @@ npx shadow-cljs compile dhcp-client dhcp-server ping-client read-pcap
   a server.
 
   ```
-  sudo node ./build/dhcp-client.js eth0
+  sudo node ./build/dhcp-client.js --if-name eth0
   ```
 
 * **DHCP pool server** - Run a DHCP server on eth0 that allocates from

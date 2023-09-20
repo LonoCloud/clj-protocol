@@ -89,7 +89,7 @@
 
   (let [if-info (util/get-if-ipv4 if-name)
         file-cfg (when config-file
-                   (edn/read-string (util/slurp config-file)))
+                   (util/load-config config-file))
         log-msg logging/log-message
 
         ;; precedence: CLI opts, file config, discovered interface info

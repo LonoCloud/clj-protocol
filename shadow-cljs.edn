@@ -12,18 +12,16 @@
    :output-to "build/dhcp-client.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
-
    :compiler-options
    {:optimizations :simple
     :source-map-use-fs-paths true}}
 
-  :dhcp-server
+  :pool-server
   {:target :node-script
    :main dhcp.json-pool-server/main
-   :output-to "build/dhcp-server.js"
+   :output-to "build/pool-server.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
-
    :compiler-options
    {:optimizations :simple
     :source-map-use-fs-paths true}}
@@ -34,7 +32,6 @@
    :output-to "build/ping.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
-
    :compiler-options
    {:optimizations :simple
     :source-map-use-fs-paths true}}
@@ -45,7 +42,6 @@
    :output-to "build/read-pcap.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
-
    :compiler-options
    {:optimizations :simple
     :source-map-use-fs-paths true}}
@@ -53,7 +49,6 @@
   :test
   {:target :node-test
    :output-to "build/test.js"
-
    :compiler-options
    {:optimizations :simple
     :source-map-use-fs-paths true}}

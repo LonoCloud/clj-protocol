@@ -23,15 +23,19 @@
 (defn deep-merge' [a b] (merge-with #(if (map? %2) (deep-merge' %1 %2) %2) a b))
 (defn deep-merge [x & xs] (reduce deep-merge' x xs))
 
+(defn get-ifs-ipv4
+  "Get IPv4 information for all interfaces"
+  []
+  (into {} (for [[k intfs] (-> (os/networkInterfaces) ->clj)
+                 :let [intf (first (filter #(= "IPv4" (:family %)) intfs))
+                       {:keys [address netmask]} intf
+                       broadcast (addrs/broadcast address netmask)]]
+             [(name k) (assoc intf :broadcast broadcast)])))
+
 (defn get-if-ipv4
   "Get interface information for the interface `if-name`"
   [if-name]
-  (let [srv-ifs (-> (os/networkInterfaces) (js->clj :keywordize-keys true))
-        srv-if-ipv4 (-> srv-ifs (get (keyword if-name)) first)
-        {:keys [address netmask]} srv-if-ipv4]
-    (when srv-if-ipv4
-      (assoc srv-if-ipv4
-             :broadcast (addrs/broadcast address netmask)))))
+  (get (get-ifs-ipv4) if-name))
 
 (defn set-ip-address
   "Set the `address` and `netmask` for the interface `if-name`"

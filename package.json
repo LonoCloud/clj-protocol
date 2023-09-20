@@ -9,6 +9,7 @@
   "dependencies": {
     "ffi-napi": "^4.0.3",
     "fs-extra": "^3.0.1",
+    "js-yaml": "^4.1.0",
     "minimist": "^1.2.0",
     "nbb": "^0.7.132",
     "pcap": "3.1.0",

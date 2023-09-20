@@ -4,6 +4,8 @@
 (ns dhcp.util
   "Interface and file I/O utility functions."
   (:require [clojure.string :as string]
+            [clojure.edn :as edn]
+            [cljs-bean.core :refer [->clj]]
             [protocol.addrs :as addrs]
             ["os" :as os]
             ["fs" :as fs]
@@ -22,6 +24,19 @@
 
 (defn deep-merge' [a b] (merge-with #(if (map? %2) (deep-merge' %1 %2) %2) a b))
 (defn deep-merge [x & xs] (reduce deep-merge' x xs))
+
+(defn load-config
+  "Load a config-file (JSON, YAML, or EDN based on filename extension)"
+  [config-file]
+  (let [kind (-> config-file (string/split #"\.") last .toLowerCase)
+        raw (slurp config-file)
+        cfg (condp contains? kind
+              #{"edn"} (-> raw edn/read-string)
+              #{"json"} (-> raw js/JSON.parse ->clj)
+              #{"yaml" "yml"} (let [yaml (js/require "js-yaml")]
+                                (-> raw yaml.load ->clj)))]
+    cfg))
+
 
 (defn get-ifs-ipv4
   "Get IPv4 information for all interfaces"

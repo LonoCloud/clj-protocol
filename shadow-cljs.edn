@@ -3,7 +3,7 @@
  ["src/" "test/"]
 
  :dependencies
- []
+ [[cljs-bean "1.9.0"]]
 
  :builds
  {:dhcp-client

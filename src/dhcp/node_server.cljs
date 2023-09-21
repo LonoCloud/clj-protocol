@@ -40,9 +40,10 @@
 (defn create-server
   "Create a DHCP server listening on `if-name` that will call
   `message-handler` to get a response message for a client message."
-  [{:keys [if-name buffsz log-msg
+  [{:keys [if-name port buffsz log-msg
            server-message-handler error-handler] :as cfg
-    :or {server-message-handler server-message-handler
+    :or {port dhcp/RECV-PORT
+         server-message-handler server-message-handler
          log-msg #(apply println %&)
          error-handler #(prn :err %)}}]
   (let [sock (dgram/createSocket #js {:type "udp4" :reuseAddr true})
@@ -57,7 +58,7 @@
              (.setBroadcast sock true)
              (when (not= "all" if-name) (socket/bind-to-device sock if-name))
              (when buffsz (socket/set-rcvbuf sock buffsz))
-             (log-msg :info (str "Listening to port " dhcp/RECV-PORT
+             (log-msg :info (str "Listening to port " port
                                  " on " if-name))))
-      (.bind dhcp/RECV-PORT))
+      (.bind port))
     cfg))

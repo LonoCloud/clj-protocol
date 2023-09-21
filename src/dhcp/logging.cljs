@@ -3,7 +3,9 @@
 ;;
 ;; Efficient logging
 ;;
-(def log-config (atom {}))
+(def log-config (atom {:pending 0
+                       :log-prefix ""
+                       :log-level 2}))
 
 (defn log-message
   "Print a log message for the message in `msg`. If kind is :info or
@@ -44,7 +46,9 @@
                          (assoc % :pending 0))
                        %)))
 
-(defn start-logging [{:keys [log-prefix] :as cfg}]
-  (let [log-prefix (if (empty? log-prefix) "" (str log-prefix " "))]
-    (reset! log-config (merge cfg {:pending 0 :log-prefix log-prefix})))
+(defn start-logging [{:keys [log-prefix log-level] :as cfg
+                      :or {log-prefix "" log-level 2}}]
+  (reset! log-config (merge cfg {:pending 0
+                                 :log-prefix (str log-prefix " ")
+                                 :log-level log-level}))
   (js/setInterval log-flush 500))

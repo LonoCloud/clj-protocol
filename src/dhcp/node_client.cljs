@@ -43,8 +43,9 @@
   assigned to that interface. We only listen for UDP packets that we
   didn't send (from `hw-addr`) and that are destined for
   [[dhcp/SEND-PORT]]"
-  [{:keys [log-msg hw-addr if-name] :as cfg}]
-  (let [pcap-filter (str "udp and dst port " dhcp/SEND-PORT
+  [{:keys [log-msg hw-addr if-name port] :as cfg
+    :or {port dhcp/SEND-PORT}}]
+  (let [pcap-filter (str "udp and dst port " port
                          " and not ether src " hw-addr)
         psession (pcap/createSession if-name #js {:filter pcap-filter})]
     (log-msg :info (str "Listening via pcap (filter: '" pcap-filter "')"))
@@ -56,9 +57,10 @@
                         (client-message-handler cfg dhcp nil)))))))
 
 (defn create-client
-  [{:keys [if-name buffsz server-ip unicast
+  [{:keys [if-name port buffsz server-ip unicast
            client-message-handler log-msg error-handler] :as cfg
-    :or {client-message-handler client-message-handler
+    :or {port dhcp/SEND-PORT
+         client-message-handler client-message-handler
          log-msg #(apply println %&)
          error-handler #(prn :err %)}}]
   (let [sock (dgram/createSocket #js {:type "udp4" :reuseAddr true})
@@ -75,9 +77,9 @@
              (when buffsz (socket/set-rcvbuf sock buffsz))
              (socket/bind-to-device sock if-name)
              (.setBroadcast sock true)
-             (log-msg :info (str "Listening to port "
-                                 dhcp/SEND-PORT " on " if-name))))
-      (.bind dhcp/SEND-PORT (when-not unicast "255.255.255.255")))
+             (log-msg :info (str "Listening to port " port
+                                 " on " if-name))))
+      (.bind port (when-not unicast "255.255.255.255")))
     (if unicast
       (doto sock
         (.on "message" (fn [buf rinfo]

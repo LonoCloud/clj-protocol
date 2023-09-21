@@ -9,7 +9,7 @@
   :dependencies [[org.clojure/clojure "1.10.3"]
                  [org.clojure/clojurescript "1.10.866"]]
 
-  :plugins [[lein-codox "0.10.7"]]
+  :plugins [[lein-codox "0.10.8"]]
   :codox
   {:language :clojurescript
    :source-paths ["src"]

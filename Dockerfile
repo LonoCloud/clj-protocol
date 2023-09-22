@@ -15,7 +15,7 @@ RUN cd /app && shadow-cljs info
 ADD src/ /app/src/
 ADD test/ /app/test/
 RUN cd /app && \
-    shadow-cljs compile dhcp-client pool-server mac2ip-server ping-client read-pcap test && \
+    shadow-cljs compile simple-client pool-server mac2ip-server ping-client read-pcap test && \
     chmod +x build/*.js
 
 

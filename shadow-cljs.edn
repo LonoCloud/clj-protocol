@@ -6,10 +6,10 @@
  [[cljs-bean "1.9.0"]]
 
  :builds
- {:dhcp-client
+ {:simple-client
   {:target :node-script
-   :main dhcp.node-client/main
-   :output-to "build/dhcp-client.js"
+   :main dhcp.simple-client/main
+   :output-to "build/simple-client.js"
    ;; Don't try and connect back to shadow-cljs process
    :devtools {:enabled false :console-support false}
    :compiler-options

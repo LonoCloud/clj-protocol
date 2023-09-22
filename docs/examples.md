@@ -11,18 +11,18 @@ The project includes five working examples:
 Build the examples:
 
 ```
-npx shadow-cljs compile dhcp-client pool-server mac2ip-server ping-client read-pcap
+npx shadow-cljs compile simple-client pool-server mac2ip-server ping-client read-pcap
 ```
 
 ## Usage:
 
-* **DHCP client** - Run a DHCP client on eth0. Listening on port 68
-  requires elevated permissions. WARNING: this will attempt to update
-  your IP address on eth0 if it receives a successful response from
-  a server.
+* **DHCP simple client** - Run a DHCP client on eth0. Listening on
+  port 68 requires elevated permissions. WARNING: this will attempt to
+  update your IP address on eth0 if it receives a successful response
+  from a server.
 
   ```
-  sudo node ./build/dhcp-client.js eth0
+  sudo node ./build/simple-client.js eth0
   ```
 
 * **DHCP pool server** - Run a DHCP server on eth0 that allocates from

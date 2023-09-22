@@ -67,4 +67,4 @@ services:
     <<: *service-base
     scale: 10
     #scale: 1
-    command: /root/app/init.sh /root/app/build/dhcp-client.js --unicast --server-ip 10.1.0.1 --if-name eth0 --log-level 2
+    command: /root/app/init.sh /root/app/build/simple-client.js --unicast --server-ip 10.1.0.1 --if-name eth0 --log-level 2

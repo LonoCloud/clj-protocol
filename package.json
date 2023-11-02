@@ -2,8 +2,8 @@
   "name": "clj-protocol",
   "version": "1.1.0",
   "description": "clj-protocol - Declarative protocol library",
-  "repository": "https://git.viasat.com/SDP-ScaleSimulator/SimulationService",
-  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": "https://github.com/LonoCloud/clj-protocol",
+  "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "shadow-cljs": "2.14.4"
   },

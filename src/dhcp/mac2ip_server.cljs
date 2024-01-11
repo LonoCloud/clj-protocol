@@ -45,30 +45,61 @@ Options:
                   :mac-end   (-> r :mac-end   addrs/mac->int)})]
     (assoc cfg :ranges ranges)))
 
-(defn mac->ip [msg-map ranges]
-  (let [mac-int (addrs/mac->int (:chaddr msg-map))
+(defn mac->ip [chaddr ranges]
+  (let [mac-int (addrs/mac->int chaddr)
         r (first (filter #(and (>= mac-int (:mac-start %))
                                (<= mac-int (:mac-end %)))
                          ranges))]
     (when r
       (addrs/int->ip (+ (:ip-start r) (- mac-int (:mac-start r)))))))
 
-(defn mac2ip-handler [{:keys [ranges server-info log-msg
-                              log-level] :as cfg} msg-map]
-  (let [ip (mac->ip msg-map ranges)]
-    (if (not ip)
-      (do
-        (log-msg :error (str "MAC " (:chaddr msg-map) " is out of range"))
-        nil)
+(defn ip->mac [ip ranges]
+  (let [ip-int (addrs/ip->int ip)
+        r (first (filter #(and (>= ip-int (:ip-start %))
+                               (<= ip-int (:ip-end %)))
+                         ranges))]
+    (when r
+      (addrs/int->mac (+ (:mac-start r) (- ip-int (:ip-start r)))))))
+
+(defn mac2ip-handler [{:keys [ranges server-info log-msg log-level] :as cfg}
+                      {:keys [chaddr ciaddr] :as msg-map}]
+  (if (= :LEASEQUERY (:opt/msg-type msg-map))
+    (let [[mac ip kind] (cond
+                          ciaddr [(ip->mac ciaddr ranges) ciaddr "IP"]
+                          chaddr [chaddr (mac->ip chaddr ranges) "MAC"]
+                          :else  [nil nil "Client-identifier"])
+          msg-resp (if (and mac ip)
+                     (merge
+                       (select-keys msg-map [:giaddr :opt/relay-agent-info])
+                       {:opt/msg-type :LEASEACTIVE
+                        :chaddr mac
+                        :ciaddr ip})
+                     {:opt/msg-type :LEASEUNKNOWN})]
       (do
         (condp = log-level
-          2 (log-msg :info (str "Assigning " ip " to " (:chaddr msg-map)))
+          2 (log-msg :info (str "Leasequery by " kind " "
+                                (condp = kind
+                                  "IP"  (str ciaddr " to " mac)
+                                  "MAC" (str chaddr " to " ip)
+                                  :else (str "unsupported"))))
           nil)
-        (merge
-          (dhcp/default-response msg-map server-info)
-          (select-keys msg-map [:giaddr :opt/relay-agent-info])
-          (:fields cfg) ;; config file field/option overrides
-          {:yiaddr ip})))))
+        (merge (dhcp/default-response msg-map server-info)
+               (:fields cfg) ;; config file field/option overrides
+               msg-resp)))
+
+    (let [ip (mac->ip chaddr ranges)]
+      (if (not ip)
+        (do
+          (log-msg :error (str "MAC " chaddr " is out of range"))
+          nil)
+        (do
+          (condp = log-level
+            2 (log-msg :info (str "Assigning " ip " to " chaddr))
+            nil)
+          (merge (dhcp/default-response msg-map server-info)
+                 (select-keys msg-map [:giaddr :opt/relay-agent-info])
+                 (:fields cfg) ;; config file field/option overrides
+                 {:yiaddr ip}))))))
 
 (defn worker [user-cfg]
   (let [log-msg logging/log-message

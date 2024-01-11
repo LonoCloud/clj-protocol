@@ -27,6 +27,10 @@
                                        :ACK "<"
                                        :NAK "X"
                                        :RELEASE "R"
+                                       :LEASEQUERY "Lq"
+                                       :LEASEUNASSIGNED "Lu"
+                                       :LEASEUNKNOWN "LU"
+                                       :LEASEACTIVE "LA"
                                        "?"))
             (swap! log-config update :pending inc))
       2 (if (#{:send :recv} kind)

@@ -1,6 +1,6 @@
 {
   "name": "clj-protocol",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "clj-protocol - Declarative protocol library",
   "repository": "https://github.com/LonoCloud/clj-protocol",
   "license": "SEE LICENSE IN LICENSE",

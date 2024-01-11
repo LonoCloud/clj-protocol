@@ -18,14 +18,19 @@
 (def SEND-PORT 68)
 
 (def MSG-TYPE-LIST [;; num,  message, resp, broadcast
-                    [1   :DISCOVER     :OFFER true]
-                    [2   :OFFER        nil    nil]
-                    [3   :REQUEST      :ACK   true]
-                    [4   :DECLINE      nil    nil] ;; We don't currently handle decline
-                    [5   :ACK          nil    nil]
-                    [6   :NAK          nil    nil]
-                    [7   :RELEASE      :ACK   false]
-                    [8   :INFORM       :ACK   false]])
+                    [1   :DISCOVER        :OFFER   true]
+                    [2   :OFFER           nil      nil]
+                    [3   :REQUEST         :ACK     true]
+                    [4   :DECLINE         nil      nil] ;; We don't currently handle decline
+                    [5   :ACK             nil      nil]
+                    [6   :NAK             nil      nil]
+                    [7   :RELEASE         :ACK     false]
+                    [8   :INFORM          :ACK     false]
+                    [9   :FORCERENEW      :REQUEST false] ;; server to client
+                    [10  :LEASEQUERY      nil      false]
+                    [11  :LEASEUNASSIGNED nil      false]
+                    [12  :LEASEUNKNOWN    nil      false]
+                    [13  :LEASEACTIVE     nil      false]])
 
 (def MSG-TYPE-LOOKUP (fields/list->lookup MSG-TYPE-LIST [0 1] [1 0]))
 (def MSG-TYPE-RESP-LOOKUP (fields/list->lookup MSG-TYPE-LIST [1 2]))

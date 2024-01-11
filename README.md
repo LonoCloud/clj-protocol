@@ -124,7 +124,7 @@ The project includes five working examples:
 Build the examples:
 
 ```
-npx shadow-cljs compile simple-client dhcp-server ping-client read-pcap
+npx shadow-cljs compile simple-client pool-server mac2ip-server ping-client read-pcap
 ```
 
 ### Usage:
@@ -151,7 +151,7 @@ npx shadow-cljs compile simple-client dhcp-server ping-client read-pcap
   5 parallel worker processes.
 
   ```
-  sudo node ./build/mac2-ip-server.js -processes 5 --if-name eth0 --config-file mac2ip.json
+  sudo node ./build/mac2ip-server.js -processes 5 --if-name eth0 --config-file mac2ip.json
   ```
 
 * **ICMP/ping client** - Use the ping client to demonstrate ICMP
@@ -192,6 +192,12 @@ client, server, and ping client.
 ```
 cd test
 docker-compose up --force-recreate --build
+```
+
+Test the mac2ip DHCP server:
+```
+cd test
+docker-compose -f docker-compose-mac2ip.yaml up --force-recreate --build
 ```
 
 

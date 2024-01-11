@@ -4,7 +4,7 @@
 ;; This is for running in Clojure and for generating codox docs
 ;; Use shadow-cljs for building/running in ClojureScript
 
-(defproject clj-protocol "1.1.0"
+(defproject clj-protocol "1.1.1"
   :description "Declarative Protocols and Binary Formats in ClojureScript"
   :dependencies [[org.clojure/clojure "1.10.3"]
                  [org.clojure/clojurescript "1.10.866"]]

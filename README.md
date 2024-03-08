@@ -14,11 +14,18 @@ support Clojure (JVM).
 
 [//]: # (This should be kept in sync with docs/tutorial.md)
 
+The following commands can either be executed directly if you have the
+dependencies on your host. Otherwise, you can use the following
+command to launch a "dev" container with the build and runtime dependencies:
+
+```
+DOCKER_USER=$(id -u):$(id -g) docker-compose -f docker-compose.yaml -f docker-compose-dev.yaml run dev bash
+```
+
 Install dependencies and then start a REPL either using shadow-cljs or
 node babashka (nbb):
 
 ```
-cd clj-protocol
 npm install
 npx shadow-cljs node-repl
   # OR
@@ -29,7 +36,6 @@ If you are using Clojure (JVM) then you can use leiningen to start
 a REPL:
 
 ```
-cd clj-protocol
 lein repl
 ```
 
@@ -190,14 +196,12 @@ to launch a self-contained network environment that runs the DHCP
 client, server, and ping client.
 
 ```
-cd test
-docker-compose up --force-recreate --build
+docker-compose --profile dhcp,ping up --force-recreate --build
 ```
 
 Test the mac2ip DHCP server:
 ```
-cd test
-docker-compose -f docker-compose-mac2ip.yaml up --force-recreate --build
+docker-compose --profile mac2ip up --force-recreate --build
 ```
 
 

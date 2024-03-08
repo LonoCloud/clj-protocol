@@ -1,0 +1,33 @@
+# This should be overlayed on docker-compose.yaml like this:
+# docker-compose -f docker-compose.yaml -f docker-compose-dev.yaml --profile dhcp up ...
+
+version: "2.4"
+
+x-service-base: &service-base
+  image: clj-protocol:local-dev
+  build:
+    dockerfile: Dockerfile
+    context: ./
+    target: dev
+  volumes:
+    - ./:/app
+
+services:
+  pool-server:   { <<: *service-base }
+  dhcp-client:   { <<: *service-base }
+  dhcp-uclient:  { <<: *service-base }
+  ping-client:   { <<: *service-base }
+  mac2ip-server: { <<: *service-base }
+  mac2ip-client: { <<: *service-base }
+
+  dev:
+    <<: *service-base
+    user: ${DOCKER_USER:?DOCKER_USER must be set for dev mode}
+    environment:
+      - HOME=/home/developer
+    volumes:
+      - ./:/app
+      - $HOME:/home/developer
+    working_dir: /app
+    network_mode: host
+    command: sleep Infinity

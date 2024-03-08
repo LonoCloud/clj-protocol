@@ -1,0 +1,72 @@
+version: "2.4"
+
+x-service-base: &service-base
+  cap_add: [NET_ADMIN, NET_RAW, NET_BROADCAST, NET_BIND_SERVICE, SYS_ADMIN]
+  security_opt: [ 'apparmor:unconfined' ] # needed on Ubuntu 18.04
+  network_mode: none
+  image: clj-protocol:local
+  build:
+    context: ./
+  volumes:
+    - ./test/:/test/:ro
+
+x-network:
+  links:
+    - {bridge: s1, service: pool-server,   dev: eth0, ip: 10.0.0.1/24}
+    - {bridge: s1, service: dhcp-client,   dev: eth0}
+    - {bridge: s1, service: dhcp-uclient,  dev: eth0, ip: 10.0.0.10/24}
+    - {bridge: s1, service: ping-client,   dev: eth0, ip: 10.0.0.100/24}
+
+    - {bridge: s2, service: mac2ip-server, dev: eth0, ip: 10.1.0.1/16}
+    - {bridge: s2, service: mac2ip-client, dev: eth0, ip: 10.1.1.1/16,
+                                           mac: "00:00:10:01:07:01"}
+
+services:
+  net:
+    image: lonocloud/conlink:2.0.3
+    pid: host
+    network_mode: none
+    cap_add: [SYS_ADMIN, SYS_NICE, NET_ADMIN, NET_BROADCAST]
+    security_opt: [ 'apparmor:unconfined' ] # needed on Ubuntu 18.04
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker:/var/lib/docker
+      - ./:/host:ro
+    command: /app/build/conlink.js --compose-file /host/docker-compose.yaml
+
+  # DHCP pool server
+  pool-server:
+    <<: *service-base
+    profiles: [dhcp, ping]
+    command: /test/init.sh /app/build/pool-server.js eth0
+
+  # DHCP clients (broadcast)
+  dhcp-client:
+    <<: *service-base
+    profiles: [dhcp]
+    scale: 3
+    command: /test/init.sh /app/build/simple-client.js --if-name eth0
+
+  # DHCP client (unicast)
+  dhcp-uclient:
+    <<: *service-base
+    profiles: [dhcp]
+    command: /test/init.sh /app/build/simple-client.js --unicast --if-name eth0
+
+  # ping client
+  ping-client:
+    <<: *service-base
+    profiles: [ping]
+    command: /test/init.sh /app/build/ping.js 10.0.0.1
+
+  mac2ip-server:
+    <<: *service-base
+    profiles: [mac2ip]
+    command: /test/init.sh /app/build/mac2ip-server.js --processes 5 --config-file /test/mac2ip.json --if-name eth0 --log-level 2
+
+  mac2ip-client:
+    <<: *service-base
+    profiles: [mac2ip]
+    scale: 10
+    #scale: 1
+    command: /test/init.sh /app/build/simple-client.js --unicast --server-ip 10.1.0.1 --if-name eth0 --log-level 2

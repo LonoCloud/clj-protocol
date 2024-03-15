@@ -12,3 +12,6 @@ jobs:
     steps:
       - name: show lsmod
         run: lsmod
+      - name: test docker privileged
+        run: |
+          docker run --privileged --rm ubuntu:latest id

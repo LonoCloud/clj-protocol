@@ -45,3 +45,48 @@ jobs:
         run: npx shadow-cljs compile test
       - name: Run npm tests
         run: node build/test.js
+
+  compose-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: dhcp test
+        run: |
+          echo "COMPOSE_PROFILES=dhcp" > .env
+          docker-compose up --force-recreate -d
+          while ! docker-compose logs net | grep "Creating veth"; do
+            echo "Waiting for compose startup, sleeping 2 seconds"; sleep 2
+          done
+          while true; do
+            [ $(docker-compose logs | grep "client.*ACK from" | wc -l) -ge 4 ] && break
+            echo "Waiting for 4 client ACKs, sleeping 2 second"; sleep 2
+          done
+          docker-compose down --remove-orphans -t1
+
+      - name: ping test
+        run: |
+          echo "COMPOSE_PROFILES=ping" > .env
+          docker-compose up --force-recreate -d
+          while ! docker-compose logs net | grep "Creating veth"; do
+            echo "Waiting for compose startup, sleeping 2 seconds"; sleep 2
+          done
+          while true; do
+            [ $(docker-compose logs | grep "echo-reply" | wc -l) -ge 2 ] && break
+            echo "Waiting for 2+ echo replies, sleeping 2 second"; sleep 2
+          done
+          docker-compose down --remove-orphans -t1
+
+      - name: mac2ip test
+        run: |
+          echo "COMPOSE_PROFILES=mac2ip" > .env
+          docker-compose up --force-recreate -d
+          while ! docker-compose logs net | grep "Creating veth"; do
+            echo "Waiting for compose startup, sleeping 2 seconds"; sleep 2
+          done
+          while true; do
+            [ $(docker-compose logs | grep -o "worker-.*ACK to" | sort | uniq | wc -l) -ge 2 ] && break
+            echo "Waiting for 2+ uniq workers to ACK, sleeping 2 second"; sleep 2
+          done
+          docker-compose down --remove-orphans -t1

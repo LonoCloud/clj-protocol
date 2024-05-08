@@ -61,7 +61,7 @@
 (defn setsockopt
   "Set `level`/`option`/`value` socket options on `sock`"
   [sock level option value]
-  (let [fd (if (number? sock) sock ^number (.-_handle.fd sock))
+  (let [fd (if (number? sock) sock ^number (.-fd ^Object (.-_handle sock)))
         level-num (if (number? level) level (get PROTOCOLS level))
         option-num (if (number? option) option (get-in OPTIONS [level option]))
         buf (if (string? value) value (ref/alloc ref/types.int value))

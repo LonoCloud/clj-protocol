@@ -3,7 +3,8 @@
 
 (ns dhcp.node-server
   "Framework for creating DHCP server implementations."
-  (:require [clojure.string :as string]
+  (:require [promesa.core :as P]
+            [clojure.string :as string]
             [cljs-bean.core :refer [->clj]]
             [protocol.socket :as socket]
             [dhcp.core :as dhcp]
@@ -22,16 +23,16 @@
   get a response map, and then write/encode the response and send it
   via `sock`."
   [{:keys [log-msg sock message-handler disable-broadcast] :as cfg} buf rinfo]
-  (let [msg-map (dhcp/read-dhcp buf)
-        msg-type (:opt/msg-type msg-map)]
+  (P/let [msg-map (dhcp/read-dhcp buf)
+          msg-type (:opt/msg-type msg-map)]
     (if (not msg-type)
       (log-msg :error (str "Received invalid msg from " rinfo))
-      (let [resp-addr (if (and (not disable-broadcast)
-                               (dhcp/MSG-TYPE-BCAST-LOOKUP msg-type))
-                        "255.255.255.255"
-                        (:address rinfo))
-            _ (log-msg :recv msg-map resp-addr)
-            resp-msg-map (message-handler cfg msg-map)]
+      (P/let [resp-addr (if (and (not disable-broadcast)
+                                 (dhcp/MSG-TYPE-BCAST-LOOKUP msg-type))
+                          "255.255.255.255"
+                          (:address rinfo))
+              _ (log-msg :recv msg-map resp-addr)
+              resp-msg-map (message-handler cfg msg-map)]
         (if resp-msg-map
           (send-message cfg resp-msg-map resp-addr (:port rinfo))
           (log-msg :error "No msg-map from message-handler, ignoring"))))))

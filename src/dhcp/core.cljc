@@ -37,10 +37,12 @@
 (def MSG-TYPE-BCAST-LOOKUP (fields/list->lookup MSG-TYPE-LIST [1 3]))
 
 ;; https://datatracker.ietf.org/doc/html/rfc3046
+;; https://datatracker.ietf.org/doc/html/rfc3527
 (def OPTS-RELAY-AGENT-LIST
   ;; code, name, type
   [[0x01  :circuit-id     :raw   ]
    [0x02  :remote-id      :raw   ]
+   [0x05  :link-selection :ipv4  ]
    [0x06  :subscriber-id  :utf8  ]])
 (def OPTS-RELAY-AGENT-LOOKUP (tlvs/tlv-list->lookup OPTS-RELAY-AGENT-LIST))
 

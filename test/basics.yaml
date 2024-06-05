@@ -1,0 +1,71 @@
+name: "Basic tests (DHCP, ping, mac2ip)"
+
+env:
+  DC: "${{ process.env.DOCKER_COMPOSE || 'docker compose' }}"
+
+tests:
+  dhcp:
+    name: "DHCP test"
+    env:
+      COMPOSE_PROFILES: dhcp
+    steps:
+      - exec: :host
+        run: |
+          ${DC} down --remove-orphans --volumes -t1
+          ${DC} up -d --force-recreate
+      - exec: :host
+        run: |
+          echo "Waiting for compose startup"
+          ${DC} logs net | grep "Creating veth"
+        repeat: { retries: 30, interval: '2s' }
+
+      - exec: :host
+        run: '[ $(${DC} logs | grep "client.*ACK from" | wc -l) -ge 4 ]'
+        repeat: { retries: 30, interval: '2s' }
+
+      - exec: :host
+        run: ${DC} down --remove-orphans --volumes -t1
+
+  ping:
+    name: "ping test"
+    env:
+      COMPOSE_PROFILES: ping
+    steps:
+      - exec: :host
+        run: |
+          ${DC} down --remove-orphans --volumes -t1
+          ${DC} up -d --force-recreate
+      - exec: :host
+        run: |
+          echo "Waiting for compose startup"
+          ${DC} logs net | grep "Creating veth"
+        repeat: { retries: 30, interval: '2s' }
+
+      - exec: :host
+        run: '[ $(${DC} logs | grep "echo-reply" | wc -l) -ge 2 ]'
+        repeat: { retries: 30, interval: '2s' }
+
+      - exec: :host
+        run: ${DC} down --remove-orphans --volumes -t1
+
+  mac2ip:
+    name: "mac2ipi test"
+    env:
+      COMPOSE_PROFILES: mac2ip
+    steps:
+      - exec: :host
+        run: |
+          ${DC} down --remove-orphans --volumes -t1
+          ${DC} up -d --force-recreate
+      - exec: :host
+        run: |
+          echo "Waiting for compose startup"
+          ${DC} logs net | grep "Creating veth"
+        repeat: { retries: 30, interval: '2s' }
+
+      - exec: :host
+        run: '[ $(${DC} logs | grep -o "worker-.*ACK to" | sort | uniq | wc -l) -ge 2 ]'
+        repeat: { retries: 30, interval: '2s' }
+
+      - exec: :host
+        run: ${DC} down --remove-orphans --volumes -t1

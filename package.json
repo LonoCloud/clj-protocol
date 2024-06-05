@@ -4,9 +4,6 @@
   "description": "clj-protocol - Declarative protocol library",
   "repository": "https://github.com/LonoCloud/clj-protocol",
   "license": "SEE LICENSE IN LICENSE",
-  "devDependencies": {
-    "shadow-cljs": "2.14.4"
-  },
   "dependencies": {
     "ffi-napi": "^4.0.3",
     "fs-extra": "^3.0.1",
@@ -16,5 +13,9 @@
     "pcap": "3.1.0",
     "raw-socket": "1.7.0",
     "ref-napi": "^3.0.3"
+  },
+  "devDependencies": {
+    "shadow-cljs": "2.14.4",
+    "@lonocloud/dctest": "0.1.1"
   }
 }

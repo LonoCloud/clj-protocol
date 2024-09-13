@@ -196,7 +196,7 @@ to launch a self-contained network environment that runs the DHCP
 client, server, and ping client.
 
 ```
-docker-compose --profile dhcp,ping up --force-recreate --build
+docker-compose --profile dhcp --profile ping up --force-recreate --build
 ```
 
 Test the mac2ip DHCP server:

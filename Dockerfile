@@ -1,4 +1,4 @@
-FROM node:16 as build
+FROM node:22 as build
 
 RUN apt-get -y update && \
     apt-get -y install libpcap-dev default-jdk-headless
@@ -25,7 +25,7 @@ RUN apt-get -y install isc-dhcp-client isc-dhcp-server iputils-ping curl iproute
 RUN curl -L https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein -o /usr/local/bin/lein && \
     chmod +x /usr/local/bin/lein
 
-FROM node:16-slim as run
+FROM node:22-slim as run
 
 RUN apt-get -y update
 RUN apt-get -y install libpcap-dev tcpdump iputils-ping curl iproute2

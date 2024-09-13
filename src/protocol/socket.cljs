@@ -3,8 +3,10 @@
 
 (ns protocol.socket
   "Low-level functions for setting socket options"
-  (:require ["ref-napi" :as ref]
-            ["ffi-napi" :as ffi]))
+  #_(:require ["koffi$default" :as koffi]))
+
+;; TODO: use :require syntax when shadow-cljs works with "*$default"
+(def koffi (js/require "koffi"))
 
 (def ETH-HDR-LEN 14)
 ;; Assumes no IP options (ihl = 5)
@@ -53,10 +55,10 @@
   (merge OPTIONS*
          (into {} (map (fn [[o v]] [(get PROTOCOLS o) v]) OPTIONS*))))
 
-(def ^:private bindings
-  (ffi/Library nil
-               (clj->js {"getsockopt" ["int" ["int" "int" "int" "pointer" "pointer"]]
-                         "setsockopt" ["int" ["int" "int" "int" "string" "int"]]})))
+(def libc (.load koffi "libc.so.6"))
+
+;; socklen_t -> ulong
+(def _setsockopt (.func libc "int setsockopt(int socket, int level, int option_name, const void *option_value, ulong option_len)"))
 
 (defn setsockopt
   "Set `level`/`option`/`value` socket options on `sock`"
@@ -64,12 +66,13 @@
   (let [fd (if (number? sock) sock ^number (.-fd ^Object (.-_handle sock)))
         level-num (if (number? level) level (get PROTOCOLS level))
         option-num (if (number? option) option (get-in OPTIONS [level option]))
-        buf (if (string? value) value (ref/alloc ref/types.int value))
-        sz (if (string? value) (.-length value) ref/types.int.size)
+        buf (if (string? value) value (doto (js/Buffer.alloc 4)
+                                        (.writeInt32LE value)))
+        sz (if (string? value) (.-length value) (.sizeof koffi "int"))
         f-str  (str "setsockopt(" fd ", " level ", " option ", " value ", " sz ")")
-        res (.setsockopt bindings fd level-num option-num buf sz)]
+        res (_setsockopt fd level-num option-num buf sz)]
     (if (< res 0)
-      (throw (js/Error. (str "Could not " f-str ", Errno:" (ffi/errno))))
+      (throw (js/Error. (str "Could not " f-str ", Errno:" (.errno koffi))))
       (println "Called" f-str "sucessfully. Result:" res))))
 
 ;;;
